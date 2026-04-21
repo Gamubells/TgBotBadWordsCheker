@@ -1,43 +1,31 @@
 import logging
 import os
 import sys
-import urllib.parse
-import urllib.request
 from pathlib import Path
 
+import sentry_sdk
 from loguru import logger
+from sentry_sdk.integrations.loguru import LoguruIntegration
 
 
+# Создаем папку для логов, если её нет
 LOGS_DIR = Path("logs")
 LOGS_DIR.mkdir(exist_ok=True)
 
-BOT_TOKEN = os.getenv("BOT_TOKEN")
-ADMIN_ID = os.getenv("ADMIN_ID")
-
-
-def telegram_alert_sink(message):
-
-    if not BOT_TOKEN or not ADMIN_ID:
-        return
-
-    text = f"🚨 <b>Критическая ошибка в боте!</b>\n\n<pre>{message}</pre>"
-    if len(text) > 4000:
-        text = text[:4000] + "\n...[ОБРЕЗАНО]...</pre>"
-
-    url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
-    data = urllib.parse.urlencode({"chat_id": ADMIN_ID, "text": text, "parse_mode": "HTML"}).encode(
-        "utf-8"
+# Инициализация Sentry (сработает только если DSN есть в .env)
+SENTRY_DSN = os.getenv("SENTRY_DSN")
+if SENTRY_DSN:
+    sentry_sdk.init(
+        dsn=SENTRY_DSN,
+        # Интеграция с Loguru заставит Sentry ловить все logger.error()
+        integrations=[LoguruIntegration()],
+        # Уровень отслеживания производительности (0.0 - 1.0)
+        traces_sample_rate=1.0,
     )
-
-    try:
-        req = urllib.request.Request(url, data=data)
-        with urllib.request.urlopen(req, timeout=5):
-            pass
-    except Exception as e:
-        print(f"Не удалось отправить алерт в Telegram: {e}", file=sys.stderr)
 
 
 class InterceptHandler(logging.Handler):
+    """Перехватчик для стандартного logging, чтобы всё шло в Loguru"""
 
     def emit(self, record):
         try:
@@ -54,7 +42,7 @@ class InterceptHandler(logging.Handler):
 
 
 def setup_logging():
-    """Настройка Loguru"""
+    """Настройка Loguru и перехват логов"""
     logging.basicConfig(handlers=[InterceptHandler()], level=0, force=True)
 
     logging.getLogger("aiogram").setLevel(logging.INFO)
@@ -63,8 +51,10 @@ def setup_logging():
 
     logger.remove()
 
+    # Вывод в консоль
     logger.add(sys.stdout, level="INFO", colorize=True)
 
+    # Вывод в файл (все логи)
     logger.add(
         LOGS_DIR / "app.log",
         level="INFO",
@@ -73,16 +63,11 @@ def setup_logging():
         encoding="utf-8",
     )
 
+    # Вывод в файл (только ошибки)
     logger.add(
         LOGS_DIR / "errors.log",
         level="ERROR",
         rotation="5 MB",
         retention="30 days",
         encoding="utf-8",
-    )
-
-    logger.add(
-        telegram_alert_sink,
-        level="ERROR",
-        format="{time:YYYY-MM-DD HH:mm:ss} | {name}:{function}:{line}\n{message}",
     )
