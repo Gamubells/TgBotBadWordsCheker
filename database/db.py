@@ -12,6 +12,7 @@ class Settings(BaseSettings):
     DATABASE_URL: str | None = None
     BOT_TOKEN: str
     ADMIN_ID: str
+    SENTRY_DSN: str | None = None
 
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8")
 
