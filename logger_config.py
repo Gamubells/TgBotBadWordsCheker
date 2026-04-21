@@ -84,5 +84,5 @@ def setup_logging():
     logger.add(
         telegram_alert_sink,
         level="ERROR",
-        format="{time:YYYY-MM-DD HH:mm:ss} | {name}:{funcName}:{line}\n{message}",
+        format="{time:YYYY-MM-DD HH:mm:ss} | {name}:{function}:{line}\n{message}",
     )
