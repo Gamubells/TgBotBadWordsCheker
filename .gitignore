@@ -4,3 +4,5 @@ __pycache__/
 .venv
 code2prompt
 .env
+logs/
+*.log
