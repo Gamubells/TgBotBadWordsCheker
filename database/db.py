@@ -11,6 +11,7 @@ class Settings(BaseSettings):
     DB_NAME: str
     DATABASE_URL: str | None = None
     BOT_TOKEN: str
+    ADMIN_ID: str
 
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8")
 
