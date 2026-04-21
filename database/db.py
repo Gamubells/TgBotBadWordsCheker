@@ -1,11 +1,6 @@
-import logging
-
 from pydantic import model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
-
-
-logger = logging.getLogger(__name__)
 
 
 class Settings(BaseSettings):

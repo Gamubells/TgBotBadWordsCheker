@@ -1,7 +1,7 @@
-import logging
 from datetime import datetime, time, timedelta
 from zoneinfo import ZoneInfo
 
+from loguru import logger
 from sqlalchemy import delete, select
 
 from database.db import async_session_maker
@@ -9,8 +9,6 @@ from database.models import BadWords, ReportChat, SwearLog
 
 
 TZ_KYIV = ZoneInfo("Europe/Kyiv")
-
-logger = logging.getLogger(__name__)
 
 
 class BadWordsRepository:
@@ -50,7 +48,7 @@ class BadWordsRepository:
                 logger.info(f"✓ БД: Сохранено {swears} матов для {username}")
             except Exception as e:
                 await session.rollback()
-                logger.error(f"❌ Ошибка записи в БД: {e}", exc_info=True)
+                logger.error(f"❌ Ошибка записи в БД: {e}")
                 raise
 
     @classmethod
@@ -71,7 +69,7 @@ class BadWordsRepository:
                 return 0
             except Exception as e:
                 await session.rollback()
-                logger.error(f"❌ Ошибка получения статистики: {e}", exc_info=True)
+                logger.error(f"❌ Ошибка получения статистики: {e}")
                 return 0
 
     @classmethod
@@ -86,7 +84,7 @@ class BadWordsRepository:
                 return records
             except Exception as e:
                 await session.rollback()
-                logger.error(f"❌ Ошибка получения данных за дату: {e}", exc_info=True)
+                logger.error(f"❌ Ошибка получения данных за дату: {e}")
                 return []
 
     @classmethod
@@ -111,7 +109,7 @@ class BadWordsRepository:
                 result = await session.execute(stmt)
                 return result.scalars().all()
             except Exception as e:
-                logger.error(f"❌ Ошибка получения логов: {e}", exc_info=True)
+                logger.error(f"❌ Ошибка получения логов: {e}")
                 return []
 
     @classmethod
@@ -132,7 +130,7 @@ class BadWordsRepository:
 
             except Exception as e:
                 await session.rollback()
-                logger.error(f"❌ Ошибка очистки логов: {e}", exc_info=True)
+                logger.error(f"❌ Ошибка очистки логов: {e}")
 
     @classmethod
     async def subscribe_chat(cls, chat_id: int) -> bool:
@@ -150,7 +148,7 @@ class BadWordsRepository:
                 return True
             except Exception as e:
                 await session.rollback()
-                logger.error(f"❌ Ошибка при подписке чата {chat_id}: {e}", exc_info=True)
+                logger.error(f"❌ Ошибка при подписке чата {chat_id}: {e}")
                 return False
 
     @classmethod
@@ -168,7 +166,7 @@ class BadWordsRepository:
                 return False
             except Exception as e:
                 await session.rollback()
-                logger.error(f"❌ Ошибка при отписке чата {chat_id}: {e}", exc_info=True)
+                logger.error(f"❌ Ошибка при отписке чата {chat_id}: {e}")
                 return False
 
     @classmethod
@@ -180,5 +178,5 @@ class BadWordsRepository:
                 result = await session.execute(stmt)
                 return list(result.scalars().all())
             except Exception as e:
-                logger.error(f"❌ Ошибка получения списка чатов: {e}", exc_info=True)
+                logger.error(f"❌ Ошибка получения списка чатов: {e}")
                 return []

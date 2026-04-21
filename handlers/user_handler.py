@@ -1,9 +1,9 @@
-import logging
 from datetime import date, datetime
 
 from aiogram import F, Router
 from aiogram.filters import Command, CommandStart
 from aiogram.types import Message
+from loguru import logger
 
 from database.orm_query import TZ_KYIV, BadWordsRepository
 from services import check_text_for_swears
@@ -47,19 +47,15 @@ async def count_command_handler(message: Message):
         )
 
         count = count or 0
-        logging.info(
-            "count command: chat_id=%s user_id=%s date=%s count=%s",
-            message.chat.id,
-            message.from_user.id,
-            request_date,
-            count,
+        logger.info(
+            f"count command: chat_id={message.chat.id} user_id={message.from_user.id} date={request_date} count={count}"
         )
 
         await message.answer(
             f"📊 {message.from_user.full_name}, у тебя сегодня {count} ругательств."
         )
     except Exception as e:
-        logging.error(f"Ошибка получения статистики: {e}")
+        logger.error(f"Ошибка получения статистики: {e}")
         await message.answer("⚠️ Не удалось получить статистику.")
 
 
@@ -127,20 +123,13 @@ async def logs_command_handler(message: Message):
 
 @router.message(F.text)
 async def bad_words_handler(message: Message):
-    logging.info(
-        "received message: %s from %s (id=%s, bot=%s)",
-        message.text,
-        message.from_user.full_name,
-        message.from_user.id,
-        message.from_user.is_bot,
+    logger.info(
+        f"received message: {message.text} from {message.from_user.full_name} (id={message.from_user.id}, bot={message.from_user.is_bot})"
     )
 
     if message.from_user.is_bot or not message.text or message.text.startswith("/"):
-        logging.info(
-            "message ignored: bot=%s, text_exists=%s, is_command=%s",
-            message.from_user.is_bot,
-            bool(message.text),
-            message.text.startswith("/") if message.text else False,
+        logger.info(
+            f"message ignored: bot={message.from_user.is_bot}, text_exists={bool(message.text)}, is_command={message.text.startswith('/') if message.text else False}"
         )
         return
 
@@ -149,7 +138,7 @@ async def bad_words_handler(message: Message):
     if not badwords_count:
         return
 
-    logging.info(
+    logger.info(
         f"Найдены маты: {found_words} (всего: {badwords_count}) от "
         f"{message.from_user.full_name} (uid:{message.from_user.id})"
     )
@@ -162,6 +151,6 @@ async def bad_words_handler(message: Message):
             date=date.today(),
             found_words=found_words,
         )
-        logging.info(f"✓ Добавлено {badwords_count} матов в БД от {message.from_user.full_name}")
+        logger.info(f"✓ Добавлено {badwords_count} матов в БД от {message.from_user.full_name}")
     except Exception as e:
-        logging.error(f"✗ Ошибка добавления ругательства: {e}", exc_info=True)
+        logger.error(f"✗ Ошибка добавления ругательства: {e}")

@@ -1,5 +1,6 @@
-import logging
 from datetime import date
+
+from loguru import logger
 
 from database.orm_query import BadWordsRepository
 
@@ -12,10 +13,10 @@ async def send_daily_report(bot):
         active_chats = await BadWordsRepository.get_all_active_chats()
 
         if not active_chats:
-            logging.info("ℹ️ Планировщик: Нет активных чатов для рассылки отчета.")
+            logger.info("ℹ️ Планировщик: Нет активных чатов для рассылки отчета.")
             return
 
-        logging.info(f"🚀 Планировщик: Начинаю рассылку отчетов для {len(active_chats)} чатов.")
+        logger.info(f"🚀 Планировщик: Начинаю рассылку отчетов для {len(active_chats)} чатов.")
 
         for chat_id in active_chats:
             records = await BadWordsRepository.get_all_for_date(chat_id=chat_id, date=date.today())
@@ -39,4 +40,4 @@ async def send_daily_report(bot):
             )
 
     except Exception as e:
-        logging.error(f"❌ Ошибка внутри планировщика отчетов: {e}", exc_info=True)
+        logger.error(f"❌ Ошибка внутри планировщика отчетов: {e}")
