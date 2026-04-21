@@ -74,6 +74,7 @@ async def on_shutdown(bot):
 
 async def main() -> None:
     logger.info("📱 Запуск бота...")
+    logger.error("Это тестовая ошибка! Проверяю доставку в личку 😎")
     await bot.delete_webhook(drop_pending_updates=True)
     dp.startup.register(on_startup)
     dp.shutdown.register(on_shutdown)
