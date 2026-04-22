@@ -1,4 +1,4 @@
-name: CI Pipeline
+name: CI/CD Pipeline
 
 on:
   push:
@@ -7,9 +7,9 @@ on:
       - main
 
 jobs:
+  # ЭТАП 1: ТАМОЖНЯ (CI)
   test-and-lint:
     runs-on: self-hosted
-
     steps:
       - name: 📥 Клонирование репозитория
         uses: actions/checkout@v4
@@ -31,4 +31,14 @@ jobs:
       - name: 🧪 Запуск тестов (Pytest)
         env:
           PYTHONPATH: .
-        run: poetry run pytest tests/ -v
+        run: poetry run python -m pytest tests/ -v
+
+  deploy:
+    needs: test-and-lint
+    runs-on: self-hosted
+    steps:
+      - name: 🚀 Перезапуск бота
+        run: |
+          cd /home/nekoneki/TgBotBadWordsCheker 
+          git pull
+          docker compose up -d --build
