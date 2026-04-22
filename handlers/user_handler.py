@@ -48,7 +48,8 @@ async def count_command_handler(message: Message):
 
         count = count or 0
         logger.info(
-            f"count command: chat_id={message.chat.id} user_id={message.from_user.id} date={request_date} count={count}"
+            f"count command: chat_id={message.chat.id} "
+            f"user_id={message.from_user.id} date={request_date} count={count}"
         )
 
         await message.answer(
@@ -124,12 +125,14 @@ async def logs_command_handler(message: Message):
 @router.message(F.text)
 async def bad_words_handler(message: Message):
     logger.info(
-        f"received message: {message.text} from {message.from_user.full_name} (id={message.from_user.id}, bot={message.from_user.is_bot})"
+        f"received message: {message.text} from {message.from_user.full_name} "
+        f"(id={message.from_user.id}, bot={message.from_user.is_bot})"
     )
 
     if message.from_user.is_bot or not message.text or message.text.startswith("/"):
         logger.info(
-            f"message ignored: bot={message.from_user.is_bot}, text_exists={bool(message.text)}, is_command={message.text.startswith('/') if message.text else False}"
+            f"message ignored: bot={message.from_user.is_bot}, text_exists={bool(message.text)}, "
+            f"is_command={message.text.startswith('/') if message.text else False}"
         )
         return
 

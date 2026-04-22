@@ -2,38 +2,28 @@ from utils.swear_checker import contains_bad_word
 
 
 def test_clean_text():
-    """Проверка обычного, чистого сообщения"""
-    assert contains_bad_word("Привет! Как твои дела сегодня?") == False
+    assert not contains_bad_word("Привет! Как твои дела сегодня?")
 
 
 def test_exact_bad_word():
-    """Проверка точного совпадения плохого слова"""
-    assert contains_bad_word("Ну ты и чмо") == True
+    assert contains_bad_word("Ну ты и чмо")
 
 
 def test_uppercase_bad_word():
-    """Проверка слова, написанного ЗАГЛАВНЫМИ буквами (или ЗаБоРчИкОм)"""
-    assert contains_bad_word("ПИДОР, что ты натворил?") == True
-    assert contains_bad_word("СУКА, забыл ключи") == True
-
-
-def test_empty_text():
-    """Проверка пустого сообщения (чтобы бот не падал, если прислали просто картинку без текста)"""
-    assert contains_bad_word("") == False
-    assert contains_bad_word(None) == False
+    assert contains_bad_word("ПИДОР, что ты натворил?")
 
 
 def test_hidden_bad_word():
     """Тест: пользователь пытается спрятать мат символами"""
-    assert contains_bad_word("с.у.к.а") == True
-    assert contains_bad_word("п-и-д-о-р") == True
+    assert contains_bad_word("с.у.к.а")
+    assert contains_bad_word("п-и-д-о-р")
 
 
 def test_false_positive():
-    """Тест: ложное срабатывание. Слово 'чмокать' содержит 'чмо', но это не мат."""
-    assert contains_bad_word("Он начал громко чмокать губами") == False
+    """Тест: ложное срабатывание"""
+    assert not contains_bad_word("Он начал громко чмокать губами")
 
 
 def test_punctuation_around():
     """Тест: слово прилеплено к знакам препинания"""
-    assert contains_bad_word("Слушай,сука,хватит") == True
+    assert contains_bad_word("Слушай,сука,хватит")

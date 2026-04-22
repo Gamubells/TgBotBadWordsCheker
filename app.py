@@ -1,9 +1,7 @@
 import asyncio
-import os
 from os import getenv
 from zoneinfo import ZoneInfo
 
-import sentry_sdk
 from aiogram import Bot, Dispatcher
 from aiogram.fsm.storage.memory import MemoryStorage
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
