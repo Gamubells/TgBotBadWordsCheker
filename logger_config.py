@@ -18,7 +18,6 @@ BOT_TOKEN = os.getenv("BOT_TOKEN")
 ADMIN_ID = os.getenv("ADMIN_ID")
 
 
-# --- ВОТ ЭТУ ФУНКЦИЮ ВОЗВРАЩАЕМ ---
 def telegram_alert_sink(message):
     if not BOT_TOKEN or not ADMIN_ID:
         return
@@ -38,7 +37,6 @@ def telegram_alert_sink(message):
         print(f"Ошибка отправки алерта: {e}", file=sys.stderr)
 
 
-# --- ИНИЦИАЛИЗАЦИЯ SENTRY ---
 if SENTRY_DSN:
     sentry_sdk.init(
         dsn=SENTRY_DSN,
@@ -64,13 +62,10 @@ def setup_logging():
     logging.basicConfig(handlers=[InterceptHandler()], level=0, force=True)
     logger.remove()
 
-    # 1. Консоль
     logger.add(sys.stdout, level="INFO", colorize=True)
 
-    # 2. Файл со всеми логами
     logger.add(LOGS_DIR / "app.log", rotation="5 MB", level="INFO")
 
-    # 3. 🔥 АЛЕРТ В ТЕЛЕГРАМ (Локальный)
     logger.add(
         telegram_alert_sink,
         level="ERROR",

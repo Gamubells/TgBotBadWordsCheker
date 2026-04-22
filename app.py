@@ -1,7 +1,9 @@
 import asyncio
+import os
 from os import getenv
 from zoneinfo import ZoneInfo
 
+import sentry_sdk
 from aiogram import Bot, Dispatcher
 from aiogram.fsm.storage.memory import MemoryStorage
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
@@ -77,6 +79,10 @@ async def main() -> None:
     await bot.delete_webhook(drop_pending_updates=True)
     dp.startup.register(on_startup)
     dp.shutdown.register(on_shutdown)
+    print(f"ПРОВЕРКА DSN: {os.getenv('SENTRY_DSN')}")
+
+    sentry_sdk.capture_message("Прямой тестовый выстрел в Sentry!")
+    sentry_sdk.flush()
 
     scheduler = AsyncIOScheduler(timezone=ZoneInfo("Europe/Kyiv"))
     try:
