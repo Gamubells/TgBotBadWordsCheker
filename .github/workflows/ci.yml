@@ -1,0 +1,32 @@
+name: CI Pipeline
+
+on:
+  push:
+    branches:
+      - master
+      - main
+
+jobs:
+  test-and-lint:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: 📥 Клонирование репозитория
+        uses: actions/checkout@v4
+
+      - name: 🐍 Установка Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: 📦 Установка Poetry
+        run: pip install poetry
+
+      - name: 🛠️ Установка зависимостей
+        run: poetry install --no-root
+
+      - name: 🧹 Проверка линтером (Ruff)
+        run: poetry run ruff check .
+
+      - name: 🧪 Запуск тестов (Pytest)
+        run: poetry run pytest tests/ -v
