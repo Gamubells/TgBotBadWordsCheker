@@ -38,9 +38,16 @@ def telegram_alert_sink(message):
 
 
 if SENTRY_DSN:
+    import logging
+
     sentry_sdk.init(
         dsn=SENTRY_DSN,
-        integrations=[LoguruIntegration()],
+        integrations=[
+            LoguruIntegration(
+                level=logging.INFO,
+                event_level=logging.ERROR,
+            )
+        ],
         traces_sample_rate=1.0,
     )
 
