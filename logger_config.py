@@ -1,3 +1,4 @@
+import html
 import logging
 import os
 import sys
@@ -7,7 +8,6 @@ from pathlib import Path
 
 import sentry_sdk
 from loguru import logger
-from sentry_sdk.integrations.loguru import LoguruIntegration
 
 
 LOGS_DIR = Path("logs")
@@ -17,14 +17,29 @@ SENTRY_DSN = os.getenv("SENTRY_DSN")
 BOT_TOKEN = os.getenv("BOT_TOKEN")
 ADMIN_ID = os.getenv("ADMIN_ID")
 
+if SENTRY_DSN:
+    sentry_sdk.init(dsn=SENTRY_DSN, traces_sample_rate=1.0)
+
+
+def sentry_sink(message):
+    record = message.record
+    if record["exception"]:
+        sentry_sdk.capture_exception(record["exception"].value)
+    else:
+        sentry_sdk.capture_message(record["message"], level="error")
+    sentry_sdk.flush()
+
 
 def telegram_alert_sink(message):
+    """Отправка ошибок в ТГ с защитой от HTML-тегов"""
     if not BOT_TOKEN or not ADMIN_ID:
         return
 
-    text = f"🚨 <b>Ошибка в боте!</b>\n\n<pre>{message}</pre>"
+    escaped_msg = html.escape(str(message))
+
+    text = f"🚨 <b>Ошибка в боте!</b>\n\n<pre>{escaped_msg}</pre>"
     if len(text) > 4000:
-        text = text[:4000] + "..."
+        text = text[:4000] + "\n...[ОБРЕЗАНО]...</pre>"
 
     url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
     try:
@@ -34,22 +49,7 @@ def telegram_alert_sink(message):
         with urllib.request.urlopen(urllib.request.Request(url, data=data), timeout=5):
             pass
     except Exception as e:
-        print(f"Ошибка отправки алерта: {e}", file=sys.stderr)
-
-
-if SENTRY_DSN:
-    import logging
-
-    sentry_sdk.init(
-        dsn=SENTRY_DSN,
-        integrations=[
-            LoguruIntegration(
-                level=logging.INFO,
-                event_level=logging.ERROR,
-            )
-        ],
-        traces_sample_rate=1.0,
-    )
+        print(f"Ошибка отправки алерта в ТГ: {e}", file=sys.stderr)
 
 
 class InterceptHandler(logging.Handler):
@@ -72,6 +72,9 @@ def setup_logging():
     logger.add(sys.stdout, level="INFO", colorize=True)
 
     logger.add(LOGS_DIR / "app.log", rotation="5 MB", level="INFO")
+
+    if SENTRY_DSN:
+        logger.add(sentry_sink, level="ERROR")
 
     logger.add(
         telegram_alert_sink,
