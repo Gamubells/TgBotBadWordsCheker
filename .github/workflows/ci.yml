@@ -29,4 +29,6 @@ jobs:
         run: poetry run ruff check .
 
       - name: 🧪 Запуск тестов (Pytest)
-        run: poetry run python -m pytest tests/ -v
+        env:
+          PYTHONPATH: .
+        run: poetry run pytest tests/ -v
