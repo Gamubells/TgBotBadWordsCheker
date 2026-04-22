@@ -79,10 +79,6 @@ async def main() -> None:
     await bot.delete_webhook(drop_pending_updates=True)
     dp.startup.register(on_startup)
     dp.shutdown.register(on_shutdown)
-    print(f"ПРОВЕРКА DSN: {os.getenv('SENTRY_DSN')}")
-
-    sentry_sdk.capture_message("Прямой тестовый выстрел в Sentry!")
-    sentry_sdk.flush()
 
     scheduler = AsyncIOScheduler(timezone=ZoneInfo("Europe/Kyiv"))
     try:
