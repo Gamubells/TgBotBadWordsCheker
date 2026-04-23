@@ -6,7 +6,7 @@ from aiogram.types import Message
 from loguru import logger
 
 from database.orm_query import TZ_KYIV, BadWordsRepository
-from metrics import MESSAGES_TOTAL, SWEARS_TOTAL
+from metrics import ACTIVE_SUBSCRIPTIONS, MESSAGES_TOTAL, SWEARS_TOTAL
 from services import check_text_for_swears
 
 
@@ -23,6 +23,7 @@ async def subscribe_command_handler(message: Message):
 
     success = await BadWordsRepository.subscribe_chat(message.chat.id)
     if success:
+        ACTIVE_SUBSCRIPTIONS.inc()
         await message.answer(
             "✅ Отлично! Этот чат подписан на ежедневные отчеты (в 23:01 по Киеву)."
         )
@@ -34,6 +35,7 @@ async def subscribe_command_handler(message: Message):
 async def unsubscribe_command_handler(message: Message):
     success = await BadWordsRepository.unsubscribe_chat(message.chat.id)
     if success:
+        ACTIVE_SUBSCRIPTIONS.dec()
         await message.answer("❌ Вы отписались. Отчеты больше приходить не будут.")
     else:
         await message.answer("ℹ️ Этот чат и так не был подписан на рассылку.")
