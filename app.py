@@ -14,6 +14,7 @@ from database.models import Base
 from database.orm_query import BadWordsRepository
 from handlers.user_handler import router
 from logger_config import setup_logging
+from metrics import ACTIVE_SUBSCRIPTIONS
 from scheduler import send_daily_report
 
 
@@ -88,6 +89,10 @@ async def main() -> None:
 
         start_http_server(8000)
         logger.info("📊 Prometheus метрики доступны на порту 8000")
+
+        active_chats = await BadWordsRepository.get_all_active_chats()
+        ACTIVE_SUBSCRIPTIONS.set(len(active_chats))
+        logger.info(f"🔄 Метрика подписок инициализирована: {len(active_chats)}")
 
         scheduler.start()
         logger.info("✓ Планировщик запущен")
