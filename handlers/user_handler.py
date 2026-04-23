@@ -18,7 +18,7 @@ async def start_command_handler(message: Message):
     await message.answer("Добро пожаловать в бот, который будет считать ваши ругательства")
 
 
-@router.message(Command("subscribe"))
+@router.message(Command("subscribe_swears"))
 async def subscribe_command_handler(message: Message):
 
     success = await BadWordsRepository.subscribe_chat(message.chat.id)
@@ -31,7 +31,7 @@ async def subscribe_command_handler(message: Message):
         await message.answer("ℹ️ Этот чат уже подписан на рассылку.")
 
 
-@router.message(Command("unsubscribe"))
+@router.message(Command("unsubscribe_swears"))
 async def unsubscribe_command_handler(message: Message):
     success = await BadWordsRepository.unsubscribe_chat(message.chat.id)
     if success:
@@ -41,7 +41,7 @@ async def unsubscribe_command_handler(message: Message):
         await message.answer("ℹ️ Этот чат и так не был подписан на рассылку.")
 
 
-@router.message(Command("count"))
+@router.message(Command("count_swears"))
 async def count_command_handler(message: Message):
     request_date = date.today()
     try:
@@ -63,12 +63,12 @@ async def count_command_handler(message: Message):
         await message.answer("⚠️ Не удалось получить статистику.")
 
 
-@router.message(Command("helpy"))
+@router.message(Command("helpy_swears"))
 async def help_command_handler(message: Message):
     await message.answer("К сожалению помощь не придет.")
 
 
-@router.message(Command("about"))
+@router.message(Command("about_swears"))
 async def about_command_handler(message: Message):
     text = (
         "🛡 <b>Swear Checker Bot (v0.1.4)</b>\n\n"
@@ -80,18 +80,18 @@ async def about_command_handler(message: Message):
         "• Защита от обхода фильтра (Leetspeak, дублирование букв).\n"
         "• Персональная статистика и логирование.\n\n"
         "<b>Управление:</b>\n"
-        "▫️ <code>/count</code> — посмотреть количество своих матов за текущий день.\n"
-        "▫️ <code>/logs</code> — запросить детализацию (время и текст найденных ругательств).\n"
-        "▫️ <code>/about</code> — информация о боте.\n"
-        "▫️ <code>/helpy</code> — помощь.\n"
-        "▫️ <code>/subscribe</code> — подписаться на ежедневные отчеты (только для админов чата).\n"
-        "▫️ <code>/unsubscribe</code> — отписаться от ежедневных отчетов.\n\n"
+        "▫️ <code>/count_swears</code> — посмотреть количество своих матов за текущий день.\n"
+        "▫️ <code>/logs_swears</code> — запросить детализацию (время и текст найденных ругательств).\n"
+        "▫️ <code>/about_swears</code> — информация о боте.\n"
+        "▫️ <code>/helpy_swears</code> — помощь.\n"
+        "▫️ <code>/subscribe_swears</code> — подписаться на ежедневные отчеты (только для админов чата).\n"
+        "▫️ <code>/unsubscribe_swears</code> — отписаться от ежедневных отчетов.\n\n"
         "Автор бота: @Gamubells (Telegram)"
     )
     await message.answer(text, parse_mode="HTML")
 
 
-@router.message(Command("logs"))
+@router.message(Command("logs_swears"))
 async def logs_command_handler(message: Message):
     logs = await BadWordsRepository.get_recent_logs(
         chat_id=message.chat.id, user_id=message.from_user.id, limit=30
