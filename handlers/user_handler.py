@@ -6,6 +6,7 @@ from aiogram.types import Message
 from loguru import logger
 
 from database.orm_query import TZ_KYIV, BadWordsRepository
+from metrics import MESSAGES_TOTAL, SWEARS_TOTAL
 from services import check_text_for_swears
 
 
@@ -124,6 +125,8 @@ async def logs_command_handler(message: Message):
 
 @router.message(F.text)
 async def bad_words_handler(message: Message):
+    MESSAGES_TOTAL.inc()
+
     logger.info(
         f"received message: {message.text} from {message.from_user.full_name} "
         f"(id={message.from_user.id}, bot={message.from_user.is_bot})"
@@ -140,6 +143,8 @@ async def bad_words_handler(message: Message):
 
     if not badwords_count:
         return
+
+    SWEARS_TOTAL.inc(badwords_count)
 
     logger.info(
         f"Найдены маты: {found_words} (всего: {badwords_count}) от "

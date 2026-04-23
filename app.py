@@ -7,6 +7,7 @@ from aiogram.fsm.storage.memory import MemoryStorage
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from dotenv import load_dotenv
 from loguru import logger
+from prometheus_client import start_http_server
 
 from database.db import engine
 from database.models import Base
@@ -84,6 +85,9 @@ async def main() -> None:
         scheduler.add_job(
             BadWordsRepository.clear_old_logs, trigger="cron", hour=3, minute=0, args=[7]
         )
+
+        start_http_server(8000)
+        logger.info("📊 Prometheus метрики доступны на порту 8000")
 
         scheduler.start()
         logger.info("✓ Планировщик запущен")
