@@ -31,7 +31,6 @@ def sentry_sink(message):
 
 
 def telegram_alert_sink(message):
-    """Отправка ошибок в ТГ с защитой от HTML-тегов"""
     if not BOT_TOKEN or not ADMIN_ID:
         return
 

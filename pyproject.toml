@@ -19,6 +19,7 @@ skip-magic-trailing-comma = false
 testpaths = ["tests"]
 python_files = "test_*.py"
 addopts = "-ra -q --doctest-modules"
+pythonpath = ["."]
 [project]
 name = "badword-checker"
 version = "0.1.4"

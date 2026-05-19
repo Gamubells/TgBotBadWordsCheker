@@ -1,4 +1,5 @@
-from datetime import date, datetime
+import html
+from datetime import datetime
 
 from aiogram import F, Router
 from aiogram.filters import Command, CommandStart
@@ -43,7 +44,10 @@ async def unsubscribe_command_handler(message: Message):
 
 @router.message(Command("count_swears"))
 async def count_command_handler(message: Message):
-    request_date = date.today()
+    if not message.from_user:
+        return
+
+    request_date = datetime.now(TZ_KYIV).date()
     try:
         count = await BadWordsRepository.get_swear_count(
             chat_id=message.chat.id, user_id=message.from_user.id, date=request_date
@@ -95,6 +99,9 @@ async def about_command_handler(message: Message):
 
 @router.message(Command("logs_swears"))
 async def logs_command_handler(message: Message):
+    if not message.from_user:
+        return
+
     logs = await BadWordsRepository.get_recent_logs(
         chat_id=message.chat.id, user_id=message.from_user.id, limit=30
     )
@@ -106,7 +113,7 @@ async def logs_command_handler(message: Message):
     today_kyiv = datetime.now(TZ_KYIV).date()
     text = (
         f"📜 <b>Твои ругательства за сегодня ({today_kyiv.strftime('%d.%m.%Y')})"
-        f" — {message.from_user.full_name}:</b>\n\n"
+        f" — {html.escape(message.from_user.full_name)}:</b>\n\n"
     )
 
     grouped_logs = {}
@@ -121,7 +128,7 @@ async def logs_command_handler(message: Message):
         grouped_logs[time_str].append(log.word)
 
     for time_str in sorted(grouped_logs.keys()):
-        words_joined = ", ".join(grouped_logs[time_str])
+        words_joined = html.escape(", ".join(grouped_logs[time_str]))
         text += f"[{time_str}] <b>{words_joined}</b>\n"
 
     await message.answer(text, parse_mode="HTML")
@@ -130,6 +137,10 @@ async def logs_command_handler(message: Message):
 @router.message(F.text)
 async def bad_words_handler(message: Message):
     MESSAGES_TOTAL.inc()
+
+    if not message.from_user:
+        logger.info("message ignored: from_user is missing")
+        return
 
     logger.info(
         f"received message: {message.text} from {message.from_user.full_name} "
@@ -160,7 +171,7 @@ async def bad_words_handler(message: Message):
             user_id=message.from_user.id,
             username=message.from_user.full_name,
             swears=badwords_count,
-            date=date.today(),
+            date=datetime.now(TZ_KYIV).date(),
             found_words=found_words,
         )
         logger.info(f"✓ Добавлено {badwords_count} матов в БД от {message.from_user.full_name}")

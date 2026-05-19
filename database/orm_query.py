@@ -134,7 +134,6 @@ class BadWordsRepository:
 
     @classmethod
     async def subscribe_chat(cls, chat_id: int) -> bool:
-        """Добавляет чат в рассылку. Возвращает True если добавлен, False если уже был."""
         async with async_session_maker() as session:
             try:
                 stmt = select(ReportChat).where(ReportChat.chat_id == chat_id)
@@ -153,7 +152,6 @@ class BadWordsRepository:
 
     @classmethod
     async def unsubscribe_chat(cls, chat_id: int) -> bool:
-        """Удаляет чат из рассылки. Возвращает True если удален, False если его там не было."""
         async with async_session_maker() as session:
             try:
                 stmt = delete(ReportChat).where(ReportChat.chat_id == chat_id)
@@ -171,7 +169,6 @@ class BadWordsRepository:
 
     @classmethod
     async def get_all_active_chats(cls) -> list[int]:
-        """Получает список всех ID чатов, подписанных на рассылку."""
         async with async_session_maker() as session:
             try:
                 stmt = select(ReportChat.chat_id)

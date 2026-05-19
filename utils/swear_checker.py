@@ -1,21 +1,9 @@
-import re
+from services import check_text_for_swears
 
 
 BAD_WORDS = {"чмо", "пидор", "сука"}
 
 
 def contains_bad_word(text: str) -> bool:
-    if not text:
-        return False
-
-    text_lower = text.lower()
-
-    for word in BAD_WORDS:
-        pattern_body = r"[\W_]*".join(list(word))
-
-        pattern = rf"\b{pattern_body}\b"
-
-        if re.search(pattern, text_lower):
-            return True
-
-    return False
+    badwords_count, _ = check_text_for_swears(text)
+    return badwords_count > 0

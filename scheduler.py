@@ -1,14 +1,11 @@
-from datetime import date
+from datetime import datetime
 
 from loguru import logger
 
-from database.orm_query import BadWordsRepository
+from database.orm_query import TZ_KYIV, BadWordsRepository
 
 
 async def send_daily_report(bot):
-    """
-    Отправляет ежедневный отчет по всем подписанным чатам.
-    """
     try:
         active_chats = await BadWordsRepository.get_all_active_chats()
 
@@ -19,7 +16,9 @@ async def send_daily_report(bot):
         logger.info(f"🚀 Планировщик: Начинаю рассылку отчетов для {len(active_chats)} чатов.")
 
         for chat_id in active_chats:
-            records = await BadWordsRepository.get_all_for_date(chat_id=chat_id, date=date.today())
+            records = await BadWordsRepository.get_all_for_date(
+                chat_id=chat_id, date=datetime.now(TZ_KYIV).date()
+            )
 
             if not records:
                 await bot.send_message(chat_id, "📊 Сегодня ругательств не было. Молодцы!")
@@ -33,7 +32,6 @@ async def send_daily_report(bot):
                     f"💬 Матерных слов: {record.badwords_count}\n\n"
                 )
 
-            # Отправляем
             await bot.send_message(chat_id, "".join(text_parts))
             await bot.send_message(
                 chat_id, "Молодцы, все хорошо постарались! Завтра надо больше 😈"
