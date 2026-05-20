@@ -9,17 +9,29 @@ MEDALS = ("🥇", "🥈", "🥉")
 
 
 def format_daily_report(records) -> str:
-    sorted_records = sorted(records, key=lambda record: record.badwords_count, reverse=True)
-    total_swears = sum(record.badwords_count for record in sorted_records)
+    ranked_records = sorted(
+        (record for record in records if record.badwords_count > 0),
+        key=lambda record: record.badwords_count,
+        reverse=True,
+    )
+    total_swears = sum(record.badwords_count for record in records)
+    total_neutral = sum(record.neutral_count for record in records)
 
     text_parts = ["🏆 Матный рейтинг дня\n\n"]
-    for place, record in enumerate(sorted_records, start=1):
+    if not ranked_records:
+        text_parts.append("Сегодня матов не было.\n")
+
+    for place, record in enumerate(ranked_records, start=1):
         medal = MEDALS[place - 1] if place <= len(MEDALS) else f"{place}."
         text_parts.append(
             f"{medal} {record.username or record.user_id} — {record.badwords_count}\n"
         )
 
-    text_parts.append(f"\n━━━━━━━━━━━━━━━━\n📊 Всего: {total_swears}")
+    text_parts.append(
+        f"\n━━━━━━━━━━━━━━━━\n"
+        f"📊 Всего матов: {total_swears}\n"
+        f"🟡 Нейтральных ругательств: {total_neutral}"
+    )
     return "".join(text_parts)
 
 

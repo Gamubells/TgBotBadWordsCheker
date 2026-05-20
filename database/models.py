@@ -20,6 +20,7 @@ class BadWords(Base):
     user_id: Mapped[int] = mapped_column(BigInteger)
     username: Mapped[str] = mapped_column(String(255), nullable=True)
     badwords_count: Mapped[int] = mapped_column(Integer, default=0)
+    neutral_count: Mapped[int] = mapped_column(Integer, default=0)
     date: Mapped[date] = mapped_column(Date)
 
 
@@ -31,6 +32,7 @@ class SwearLog(Base):
     user_id: Mapped[int] = mapped_column(BigInteger)
     username: Mapped[str] = mapped_column(String(255), nullable=True)
     word: Mapped[str] = mapped_column(String(255))
+    category: Mapped[str] = mapped_column(String(32), default="swear")
     timestamp: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=lambda: datetime.now(ZoneInfo("Europe/Kyiv"))
     )

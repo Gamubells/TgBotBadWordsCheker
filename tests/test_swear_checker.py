@@ -1,7 +1,7 @@
 import pytest
 
-from bad_words_list import EXACT_WORDS, ROOT_WORDS
-from services import check_text_for_swears
+from bad_words_list import EXACT_WORDS, NEUTRAL_WORDS, ROOT_WORDS
+from services import check_text_for_swears, check_text_for_swears_detailed
 
 
 def contains_bad_word(text: str) -> bool:
@@ -14,7 +14,16 @@ def test_clean_text():
 
 
 def test_exact_bad_word():
-    assert contains_bad_word("Ну ты и чмо")
+    assert contains_bad_word("Ну ты и сука")
+
+
+def test_neutral_word_is_detected_separately():
+    result = check_text_for_swears_detailed("Ну ты и чмо")
+
+    assert result.swear_count == 0
+    assert result.swear_words == []
+    assert result.neutral_count == 1
+    assert result.neutral_words == ["чмо"]
 
 
 def test_uppercase_bad_word():
@@ -37,7 +46,11 @@ def test_punctuation_around():
 
 
 def test_exact_phrase():
-    assert contains_bad_word("Ну это голем пучеглазый")
+    result = check_text_for_swears_detailed("Ну это голем пучеглазый")
+
+    assert result.swear_count == 0
+    assert result.neutral_count == 1
+    assert result.neutral_words == ["голем пучеглазый"]
 
 
 @pytest.mark.parametrize("word", EXACT_WORDS)
@@ -46,6 +59,14 @@ def test_all_exact_words_are_detected(word):
 
     assert count >= 1
     assert word in found_words
+
+
+@pytest.mark.parametrize("word", NEUTRAL_WORDS)
+def test_all_neutral_words_are_detected(word):
+    result = check_text_for_swears_detailed(f"ну {word} тут")
+
+    assert result.neutral_count >= 1
+    assert word in result.neutral_words
 
 
 @pytest.mark.parametrize("root", ROOT_WORDS)
@@ -59,10 +80,12 @@ def test_all_roots_are_detected(root):
 
 
 def test_counts_multiple_swears_in_one_message():
-    count, found_words = check_text_for_swears("сука, какой-то дебил и п-и-д-о-р")
+    result = check_text_for_swears_detailed("сука, какой-то дебил и п-и-д-о-р")
 
-    assert count == 3
-    assert found_words == ["сука", "дебил", "пидор"]
+    assert result.swear_count == 2
+    assert result.swear_words == ["сука", "пидор"]
+    assert result.neutral_count == 1
+    assert result.neutral_words == ["дебил"]
 
 
 def test_duplicate_letters_are_normalized():
@@ -82,6 +105,11 @@ def test_leetspeak_is_normalized():
 def test_word_lists_have_no_duplicates():
     assert len(ROOT_WORDS) == len(set(ROOT_WORDS))
     assert len(EXACT_WORDS) == len(set(EXACT_WORDS))
+    assert len(NEUTRAL_WORDS) == len(set(NEUTRAL_WORDS))
+
+
+def test_word_lists_do_not_overlap():
+    assert set(EXACT_WORDS).isdisjoint(NEUTRAL_WORDS)
 
 
 def test_exact_words_do_not_duplicate_root_coverage():
@@ -100,10 +128,11 @@ def test_empty_text_is_clean():
 
 
 def test_exact_phrase_with_extra_spaces_is_detected_once():
-    count, found_words = check_text_for_swears("это голем     пучеглазый сегодня")
+    result = check_text_for_swears_detailed("это голем     пучеглазый сегодня")
 
-    assert count == 1
-    assert found_words == ["голем     пучеглазый"]
+    assert result.swear_count == 0
+    assert result.neutral_count == 1
+    assert result.neutral_words == ["голем     пучеглазый"]
 
 
 def test_exact_phrase_does_not_double_count_inner_words():
@@ -118,10 +147,12 @@ def test_exact_phrase_requires_word_boundaries():
 
 
 def test_mixed_phrase_exact_word_and_root_count_together():
-    count, found_words = check_text_for_swears("голем пучеглазый, сука, разьебал")
+    result = check_text_for_swears_detailed("голем пучеглазый, сука, разьебал")
 
-    assert count == 3
-    assert found_words == ["голем пучеглазый", "сука", "разьебал"]
+    assert result.swear_count == 2
+    assert result.swear_words == ["сука", "разьебал"]
+    assert result.neutral_count == 1
+    assert result.neutral_words == ["голем пучеглазый"]
 
 
 def test_obfuscated_word_with_symbols_counts_once():
@@ -157,31 +188,37 @@ def test_multiple_occurrences_of_same_swear_are_counted():
 
 
 def test_exact_phrase_across_newline_is_detected():
-    count, found_words = check_text_for_swears("голем\nпучеглазый")
+    result = check_text_for_swears_detailed("голем\nпучеглазый")
 
-    assert count == 1
-    assert found_words == ["голем\nпучеглазый"]
+    assert result.swear_count == 0
+    assert result.neutral_count == 1
+    assert result.neutral_words == ["голем\nпучеглазый"]
 
 
 def test_exact_phrase_with_punctuation_boundaries_is_detected():
-    count, found_words = check_text_for_swears("(голем пучеглазый)!")
+    result = check_text_for_swears_detailed("(голем пучеглазый)!")
 
-    assert count == 1
-    assert found_words == ["голем пучеглазый"]
+    assert result.swear_count == 0
+    assert result.neutral_count == 1
+    assert result.neutral_words == ["голем пучеглазый"]
 
 
 def test_phrase_match_does_not_remove_neighboring_swears():
-    count, found_words = check_text_for_swears("сука голем пучеглазый херня")
+    result = check_text_for_swears_detailed("сука голем пучеглазый херня")
 
-    assert count == 3
-    assert found_words == ["голем пучеглазый", "сука", "херня"]
+    assert result.swear_count == 1
+    assert result.swear_words == ["сука"]
+    assert result.neutral_count == 2
+    assert result.neutral_words == ["голем пучеглазый", "херня"]
 
 
 def test_legal_double_letters_are_not_over_normalized():
-    count, found_words = check_text_for_swears("ссанина и фаллос")
+    result = check_text_for_swears_detailed("ссанина и фаллос")
 
-    assert count == 2
-    assert found_words == ["ссанина", "фаллос"]
+    assert result.swear_count == 1
+    assert result.swear_words == ["ссанина"]
+    assert result.neutral_count == 1
+    assert result.neutral_words == ["фаллос"]
 
 
 def test_leetspeak_digits_are_normalized():

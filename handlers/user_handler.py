@@ -8,10 +8,18 @@ from loguru import logger
 
 from database.orm_query import TZ_KYIV, BadWordsRepository
 from metrics import ACTIVE_SUBSCRIPTIONS, MESSAGES_TOTAL, SWEARS_TOTAL
-from services import check_text_for_swears
+from services import check_text_for_swears_detailed
 
 
 router = Router()
+
+
+def format_log_word(word: str, category: str) -> str:
+    escaped_word = html.escape(word)
+    if category == "neutral":
+        return f"🟡 {escaped_word}"
+
+    return escaped_word
 
 
 async def _is_admin_or_private_chat(message: Message) -> bool:
@@ -143,10 +151,10 @@ async def logs_command_handler(message: Message):
         if time_str not in grouped_logs:
             grouped_logs[time_str] = []
 
-        grouped_logs[time_str].append(log.word)
+        grouped_logs[time_str].append(format_log_word(log.word, log.category))
 
     for time_str in sorted(grouped_logs.keys()):
-        words_joined = html.escape(", ".join(grouped_logs[time_str]))
+        words_joined = ", ".join(grouped_logs[time_str])
         text += f"[{time_str}] <b>{words_joined}</b>\n"
 
     await message.answer(text, parse_mode="HTML")
@@ -172,15 +180,18 @@ async def bad_words_handler(message: Message):
         )
         return
 
-    badwords_count, found_words = check_text_for_swears(message.text)
+    swear_check = check_text_for_swears_detailed(message.text)
 
-    if not badwords_count:
+    if not swear_check.swear_count and not swear_check.neutral_count:
         return
 
-    SWEARS_TOTAL.inc(badwords_count)
+    if swear_check.swear_count:
+        SWEARS_TOTAL.inc(swear_check.swear_count)
 
     logger.info(
-        f"Найдены маты: {found_words} (всего: {badwords_count}) от "
+        f"Найдены маты: {swear_check.swear_words} (всего: {swear_check.swear_count}), "
+        f"нейтральные ругательства: {swear_check.neutral_words} "
+        f"(всего: {swear_check.neutral_count}) от "
         f"{message.from_user.full_name} (uid:{message.from_user.id})"
     )
     try:
@@ -188,10 +199,16 @@ async def bad_words_handler(message: Message):
             chat_id=message.chat.id,
             user_id=message.from_user.id,
             username=message.from_user.full_name,
-            swears=badwords_count,
+            swears=swear_check.swear_count,
             date=datetime.now(TZ_KYIV).date(),
-            found_words=found_words,
+            found_words=swear_check.swear_words,
+            neutral_count=swear_check.neutral_count,
+            neutral_words=swear_check.neutral_words,
         )
-        logger.info(f"✓ Добавлено {badwords_count} матов в БД от {message.from_user.full_name}")
+        logger.info(
+            f"✓ Добавлено {swear_check.swear_count} матов и "
+            f"{swear_check.neutral_count} нейтральных ругательств в БД "
+            f"от {message.from_user.full_name}"
+        )
     except Exception as e:
         logger.error(f"✗ Ошибка добавления ругательства: {e}")

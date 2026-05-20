@@ -19,6 +19,22 @@ class BadWordsRepository:
                 await session.execute(
                     text(
                         """
+                        ALTER TABLE daily_swears
+                        ADD COLUMN IF NOT EXISTS neutral_count INTEGER NOT NULL DEFAULT 0
+                        """
+                    )
+                )
+                await session.execute(
+                    text(
+                        """
+                        ALTER TABLE swear_logs
+                        ADD COLUMN IF NOT EXISTS category VARCHAR(32) NOT NULL DEFAULT 'swear'
+                        """
+                    )
+                )
+                await session.execute(
+                    text(
+                        """
                         WITH ranked AS (
                             SELECT
                                 id,
@@ -28,12 +44,17 @@ class BadWordsRepository:
                                 ) AS row_num,
                                 sum(badwords_count) OVER (
                                     PARTITION BY chat_id, user_id, date
-                                ) AS total_count
+                                ) AS total_count,
+                                sum(neutral_count) OVER (
+                                    PARTITION BY chat_id, user_id, date
+                                ) AS total_neutral_count
                             FROM daily_swears
                         ),
                         updated AS (
                             UPDATE daily_swears AS daily
-                            SET badwords_count = ranked.total_count
+                            SET
+                                badwords_count = ranked.total_count,
+                                neutral_count = ranked.total_neutral_count
                             FROM ranked
                             WHERE daily.id = ranked.id AND ranked.row_num = 1
                             RETURNING daily.id
@@ -60,9 +81,20 @@ class BadWordsRepository:
                 raise
 
     @classmethod
-    async def add_swear(cls, chat_id, user_id, username, swears, date, found_words: list[str]):
+    async def add_swear(
+        cls,
+        chat_id,
+        user_id,
+        username,
+        swears,
+        date,
+        found_words: list[str],
+        neutral_count: int = 0,
+        neutral_words: list[str] | None = None,
+    ):
         async with async_session_maker() as session:
             try:
+                neutral_words = neutral_words or []
                 lock_key = f"{chat_id}:{user_id}:{date.isoformat()}"
                 await session.execute(
                     text("SELECT pg_advisory_xact_lock(hashtextextended(:lock_key, 0))"),
@@ -84,11 +116,14 @@ class BadWordsRepository:
                 if records:
                     record = records[0]
                     duplicate_count = sum(item.badwords_count for item in records[1:])
+                    duplicate_neutral_count = sum(item.neutral_count for item in records[1:])
                     record.badwords_count += swears
+                    record.neutral_count += neutral_count
                     record.username = username
 
-                    if duplicate_count:
+                    if duplicate_count or duplicate_neutral_count:
                         record.badwords_count += duplicate_count
+                        record.neutral_count += duplicate_neutral_count
                         duplicate_ids = [item.id for item in records[1:]]
                         await session.execute(
                             delete(BadWords).where(BadWords.id.in_(duplicate_ids))
@@ -99,6 +134,7 @@ class BadWordsRepository:
                         user_id=user_id,
                         username=username,
                         badwords_count=swears,
+                        neutral_count=neutral_count,
                         date=date,
                     )
                     session.add(record)
@@ -109,12 +145,27 @@ class BadWordsRepository:
                         user_id=user_id,
                         username=username,
                         word=word,
+                        category="swear",
+                        timestamp=datetime.now(TZ_KYIV),
+                    )
+                    session.add(log_entry)
+
+                for word in neutral_words:
+                    log_entry = SwearLog(
+                        chat_id=chat_id,
+                        user_id=user_id,
+                        username=username,
+                        word=word,
+                        category="neutral",
                         timestamp=datetime.now(TZ_KYIV),
                     )
                     session.add(log_entry)
 
                 await session.commit()
-                logger.info(f"✓ БД: Сохранено {swears} матов для {username}")
+                logger.info(
+                    f"✓ БД: Сохранено {swears} матов и {neutral_count} нейтральных "
+                    f"ругательств для {username}"
+                )
             except Exception as e:
                 await session.rollback()
                 logger.error(f"❌ Ошибка записи в БД: {e}")
@@ -155,6 +206,7 @@ class BadWordsRepository:
                     existing_record = records_by_user.get(record.user_id)
                     if existing_record:
                         existing_record.badwords_count += record.badwords_count
+                        existing_record.neutral_count += record.neutral_count
                     else:
                         records_by_user[record.user_id] = record
 
