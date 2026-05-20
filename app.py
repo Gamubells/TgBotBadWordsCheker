@@ -65,6 +65,11 @@ async def on_startup(bot):
         async with engine.begin() as conn:
             await conn.run_sync(Base.metadata.create_all)
         await BadWordsRepository.ensure_daily_swears_integrity()
+
+        active_chats = await BadWordsRepository.get_all_active_chats()
+        ACTIVE_SUBSCRIPTIONS.set(len(active_chats))
+        logger.info(f"🔄 Метрика подписок инициализирована: {len(active_chats)}")
+
         logger.info("✓ База данных инициализирована успешно")
     except Exception as e:
         logger.error(f"❌ Ошибка инициализации базы данных: {e}")
@@ -90,10 +95,6 @@ async def main() -> None:
 
         start_http_server(8000)
         logger.info("📊 Prometheus метрики доступны на порту 8000")
-
-        active_chats = await BadWordsRepository.get_all_active_chats()
-        ACTIVE_SUBSCRIPTIONS.set(len(active_chats))
-        logger.info(f"🔄 Метрика подписок инициализирована: {len(active_chats)}")
 
         scheduler.start()
         logger.info("✓ Планировщик запущен")

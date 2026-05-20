@@ -1,8 +1,44 @@
-.ruff_cache
-.vscode/
+# Python
 __pycache__/
-.venv
-code2prompt
+*.py[cod]
+*$py.class
+.python-version
+
+# Virtual environments
+.venv/
+venv/
+env/
+ENV/
+
+# Test, lint and coverage caches
+.pytest_cache/
+.ruff_cache/
+.coverage
+.coverage.*
+htmlcov/
+.mypy_cache/
+.pyre/
+.tox/
+
+# Packaging and build outputs
+build/
+dist/
+*.egg-info/
+
+# Environment files
 .env
+.env.*
+!.env.example
+
+# Logs
 logs/
 *.log
+
+# IDE and OS files
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# Local generated binaries/tools
+code2prompt
