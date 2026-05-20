@@ -5,6 +5,24 @@ from loguru import logger
 from database.orm_query import TZ_KYIV, BadWordsRepository
 
 
+MEDALS = ("🥇", "🥈", "🥉")
+
+
+def format_daily_report(records) -> str:
+    sorted_records = sorted(records, key=lambda record: record.badwords_count, reverse=True)
+    total_swears = sum(record.badwords_count for record in sorted_records)
+
+    text_parts = ["🏆 Матный рейтинг дня\n\n"]
+    for place, record in enumerate(sorted_records, start=1):
+        medal = MEDALS[place - 1] if place <= len(MEDALS) else f"{place}."
+        text_parts.append(
+            f"{medal} {record.username or record.user_id} — {record.badwords_count}\n"
+        )
+
+    text_parts.append(f"\n━━━━━━━━━━━━━━━━\n📊 Всего: {total_swears}")
+    return "".join(text_parts)
+
+
 async def send_daily_report(bot):
     try:
         active_chats = await BadWordsRepository.get_all_active_chats()
@@ -24,15 +42,7 @@ async def send_daily_report(bot):
                 await bot.send_message(chat_id, "📊 Сегодня ругательств не было. Молодцы!")
                 continue
 
-            text_parts = ["📊 Итоги дня:\n\n"]
-            for record in records:
-                text_parts.append(
-                    f"━━━━━━━━━━━━━━━━━\n"
-                    f"👤 {record.username or record.user_id}\n"
-                    f"💬 Матерных слов: {record.badwords_count}\n\n"
-                )
-
-            await bot.send_message(chat_id, "".join(text_parts))
+            await bot.send_message(chat_id, format_daily_report(records))
             await bot.send_message(
                 chat_id, "Молодцы, все хорошо постарались! Завтра надо больше 😈"
             )

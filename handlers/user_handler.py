@@ -14,6 +14,17 @@ from services import check_text_for_swears
 router = Router()
 
 
+async def _is_admin_or_private_chat(message: Message) -> bool:
+    if not message.from_user:
+        return False
+
+    if message.chat.type == "private":
+        return True
+
+    member = await message.bot.get_chat_member(message.chat.id, message.from_user.id)
+    return member.status in {"creator", "administrator"}
+
+
 @router.message(CommandStart())
 async def start_command_handler(message: Message):
     await message.answer("Добро пожаловать в бот, который будет считать ваши ругательства")
@@ -21,6 +32,9 @@ async def start_command_handler(message: Message):
 
 @router.message(Command("subscribe_swears"))
 async def subscribe_command_handler(message: Message):
+    if not await _is_admin_or_private_chat(message):
+        await message.answer("⛔ Подпиской на отчеты могут управлять только администраторы чата.")
+        return
 
     success = await BadWordsRepository.subscribe_chat(message.chat.id)
     if success:
@@ -34,6 +48,10 @@ async def subscribe_command_handler(message: Message):
 
 @router.message(Command("unsubscribe_swears"))
 async def unsubscribe_command_handler(message: Message):
+    if not await _is_admin_or_private_chat(message):
+        await message.answer("⛔ Подпиской на отчеты могут управлять только администраторы чата.")
+        return
+
     success = await BadWordsRepository.unsubscribe_chat(message.chat.id)
     if success:
         ACTIVE_SUBSCRIPTIONS.dec()

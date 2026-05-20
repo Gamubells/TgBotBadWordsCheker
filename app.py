@@ -64,6 +64,7 @@ async def on_startup(bot):
 
         async with engine.begin() as conn:
             await conn.run_sync(Base.metadata.create_all)
+        await BadWordsRepository.ensure_daily_swears_integrity()
         logger.info("✓ База данных инициализирована успешно")
     except Exception as e:
         logger.error(f"❌ Ошибка инициализации базы данных: {e}")

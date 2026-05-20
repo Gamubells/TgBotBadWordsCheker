@@ -39,6 +39,6 @@ jobs:
     steps:
       - name: 🚀 Перезапуск бота
         run: |
-          cd /home/nekoneki/TgBotBadWordsCheker 
+          cd /home/nekoneki/TgBotBadWordsCheker
           git pull
           docker compose up -d --build

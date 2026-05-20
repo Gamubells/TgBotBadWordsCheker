@@ -14,7 +14,7 @@ class Settings(BaseSettings):
     ADMIN_ID: str
     SENTRY_DSN: str | None = None
 
-    model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8")
+    model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
 
     @model_validator(mode="after")
     def assemble_db_url(self):

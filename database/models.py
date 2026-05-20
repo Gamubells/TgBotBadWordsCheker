@@ -1,7 +1,7 @@
 from datetime import date, datetime
 from zoneinfo import ZoneInfo
 
-from sqlalchemy import BigInteger, Date, DateTime, Integer, String
+from sqlalchemy import BigInteger, Date, DateTime, Integer, String, UniqueConstraint
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
 
@@ -11,6 +11,9 @@ class Base(DeclarativeBase):
 
 class BadWords(Base):
     __tablename__ = "daily_swears"
+    __table_args__ = (
+        UniqueConstraint("chat_id", "user_id", "date", name="uq_daily_swears_chat_user_date"),
+    )
 
     id: Mapped[int] = mapped_column(primary_key=True)
     chat_id: Mapped[int] = mapped_column(BigInteger)
