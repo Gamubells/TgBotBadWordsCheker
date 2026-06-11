@@ -1,8 +1,9 @@
-from datetime import datetime, time, timedelta
+from datetime import date, datetime, time, timedelta
+from types import SimpleNamespace
 from zoneinfo import ZoneInfo
 
 from loguru import logger
-from sqlalchemy import delete, select, text
+from sqlalchemy import delete, func, select, text
 
 from database.db import async_session_maker
 from database.models import BadWords, ReportChat, SwearLog
@@ -216,6 +217,51 @@ class BadWordsRepository:
             except Exception as e:
                 await session.rollback()
                 logger.error(f"❌ Ошибка получения данных за дату: {e}")
+                return []
+
+    @classmethod
+    async def get_all_for_month(cls, chat_id, year: int, month: int):
+        async with async_session_maker() as session:
+            try:
+                month_start = date(year, month, 1)
+                if month == 12:
+                    next_month_start = date(year + 1, 1, 1)
+                else:
+                    next_month_start = date(year, month + 1, 1)
+
+                stmt = (
+                    select(
+                        BadWords.user_id.label("user_id"),
+                        func.max(BadWords.username).label("username"),
+                        func.sum(BadWords.badwords_count).label("badwords_count"),
+                        func.sum(BadWords.neutral_count).label("neutral_count"),
+                    )
+                    .where(
+                        BadWords.chat_id == chat_id,
+                        BadWords.date >= month_start,
+                        BadWords.date < next_month_start,
+                    )
+                    .group_by(BadWords.user_id)
+                )
+
+                result = await session.execute(stmt)
+                records = [
+                    SimpleNamespace(
+                        user_id=row.user_id,
+                        username=row.username,
+                        badwords_count=row.badwords_count or 0,
+                        neutral_count=row.neutral_count or 0,
+                    )
+                    for row in result.all()
+                ]
+                logger.debug(
+                    f"✓ БД: Получено {len(records)} месячных записей "
+                    f"для {chat_id} за {year}-{month:02d}"
+                )
+                return records
+            except Exception as e:
+                await session.rollback()
+                logger.error(f"❌ Ошибка получения месячных данных: {e}")
                 return []
 
     @classmethod
