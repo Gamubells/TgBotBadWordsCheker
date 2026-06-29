@@ -46,3 +46,14 @@ class ReportChat(Base):
     subscribed_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=lambda: datetime.now(ZoneInfo("Europe/Kyiv"))
     )
+
+
+class BotChat(Base):
+    __tablename__ = "bot_chats"
+
+    chat_id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    title: Mapped[str] = mapped_column(String(255), nullable=True)
+    chat_type: Mapped[str] = mapped_column(String(32))
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=lambda: datetime.now(ZoneInfo("Europe/Kyiv"))
+    )

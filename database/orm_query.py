@@ -6,7 +6,7 @@ from loguru import logger
 from sqlalchemy import delete, func, select, text
 
 from database.db import async_session_maker
-from database.models import BadWords, ReportChat, SwearLog
+from database.models import BadWords, BotChat, ReportChat, SwearLog
 
 
 TZ_KYIV = ZoneInfo("Europe/Kyiv")
@@ -353,4 +353,42 @@ class BadWordsRepository:
                 return list(result.scalars().all())
             except Exception as e:
                 logger.error(f"❌ Ошибка получения списка чатов: {e}")
+                return []
+
+    @classmethod
+    async def upsert_bot_chat(cls, chat_id: int, title: str | None, chat_type: str) -> None:
+        async with async_session_maker() as session:
+            try:
+                stmt = select(BotChat).where(BotChat.chat_id == chat_id)
+                result = await session.execute(stmt)
+                chat = result.scalar_one_or_none()
+
+                if chat:
+                    chat.title = title
+                    chat.chat_type = chat_type
+                    chat.updated_at = datetime.now(TZ_KYIV)
+                else:
+                    session.add(
+                        BotChat(
+                            chat_id=chat_id,
+                            title=title,
+                            chat_type=chat_type,
+                            updated_at=datetime.now(TZ_KYIV),
+                        )
+                    )
+
+                await session.commit()
+            except Exception as e:
+                await session.rollback()
+                logger.error(f"❌ Ошибка сохранения чата {chat_id}: {e}")
+
+    @classmethod
+    async def get_all_bot_chats(cls) -> list[BotChat]:
+        async with async_session_maker() as session:
+            try:
+                stmt = select(BotChat).order_by(BotChat.title, BotChat.chat_id)
+                result = await session.execute(stmt)
+                return list(result.scalars().all())
+            except Exception as e:
+                logger.error(f"❌ Ошибка получения списка известных чатов: {e}")
                 return []

@@ -14,12 +14,55 @@ from services import check_text_for_swears_detailed
 router = Router()
 
 
+def parse_say_command(text: str | None) -> tuple[int | str | None, str]:
+    parts = (text or "").split(maxsplit=2)
+    if len(parts) < 3:
+        return None, ""
+
+    raw_chat_id = parts[1].strip()
+    message_text = parts[2].strip()
+    if not message_text:
+        return None, ""
+
+    if raw_chat_id.lstrip("-").isdigit():
+        return int(raw_chat_id), message_text
+
+    if raw_chat_id.startswith("@") and len(raw_chat_id) > 1:
+        return raw_chat_id, message_text
+
+    return None, ""
+
+
 def format_log_word(word: str, category: str) -> str:
     escaped_word = html.escape(word)
     if category == "neutral":
         return f"🟡 {escaped_word}"
 
     return escaped_word
+
+
+async def _remember_chat(message: Message) -> None:
+    if message.chat.type == "private":
+        return
+
+    await BadWordsRepository.upsert_bot_chat(
+        chat_id=message.chat.id,
+        title=message.chat.title,
+        chat_type=message.chat.type,
+    )
+
+
+async def _is_user_chat_admin(message: Message, chat_id: int | str) -> bool:
+    if not message.from_user:
+        return False
+
+    try:
+        member = await message.bot.get_chat_member(chat_id, message.from_user.id)
+    except Exception:
+        logger.exception(f"Не удалось проверить права пользователя в чате {chat_id}")
+        return False
+
+    return member.status in {"creator", "administrator"}
 
 
 async def _is_admin_or_private_chat(message: Message) -> bool:
@@ -40,6 +83,8 @@ async def start_command_handler(message: Message):
 
 @router.message(Command("subscribe_swears"))
 async def subscribe_command_handler(message: Message):
+    await _remember_chat(message)
+
     if not await _is_admin_or_private_chat(message):
         await message.answer("⛔ Подпиской на отчеты могут управлять только администраторы чата.")
         return
@@ -56,6 +101,8 @@ async def subscribe_command_handler(message: Message):
 
 @router.message(Command("unsubscribe_swears"))
 async def unsubscribe_command_handler(message: Message):
+    await _remember_chat(message)
+
     if not await _is_admin_or_private_chat(message):
         await message.answer("⛔ Подпиской на отчеты могут управлять только администраторы чата.")
         return
@@ -70,6 +117,8 @@ async def unsubscribe_command_handler(message: Message):
 
 @router.message(Command("count_swears"))
 async def count_command_handler(message: Message):
+    await _remember_chat(message)
+
     if not message.from_user:
         return
 
@@ -98,8 +147,66 @@ async def help_command_handler(message: Message):
     await message.answer("К сожалению помощь не придет.")
 
 
+@router.message(Command("chat_id"))
+async def chat_id_command_handler(message: Message):
+    await _remember_chat(message)
+
+    await message.answer(f"ID этого чата: <code>{message.chat.id}</code>", parse_mode="HTML")
+
+
+async def _answer_available_say_chats(message: Message) -> None:
+    if not message.from_user:
+        return
+
+    available_chats = []
+    for chat in await BadWordsRepository.get_all_bot_chats():
+        if await _is_user_chat_admin(message, chat.chat_id):
+            available_chats.append(chat)
+
+    if not available_chats:
+        await message.answer("Нету чатов, где вы админ.")
+        return
+
+    lines = ["Чаты, куда можно отправить сообщение:"]
+    for chat in available_chats:
+        title = html.escape(chat.title or str(chat.chat_id))
+        lines.append(f"• <b>{title}</b>\n<code>/say {chat.chat_id} текст</code>")
+
+    await message.answer("\n\n".join(lines), parse_mode="HTML")
+
+
+@router.message(Command("say"))
+async def say_command_handler(message: Message):
+    if not message.from_user:
+        return
+
+    if message.chat.type != "private":
+        await message.answer("Команда /say работает только в личке бота.")
+        return
+
+    target_chat_id, text = parse_say_command(message.text)
+    if target_chat_id is None:
+        await _answer_available_say_chats(message)
+        return
+
+    if not await _is_user_chat_admin(message, target_chat_id):
+        await message.answer("Вы не админ в этом чате или бот не видит этот чат.")
+        return
+
+    try:
+        await message.bot.send_message(chat_id=target_chat_id, text=text)
+    except Exception:
+        logger.exception("Ошибка отправки сообщения через /say")
+        await message.answer("Не смог отправить сообщение в чат.")
+        return
+
+    await message.answer("Отправил.")
+
+
 @router.message(Command("about_swears"))
 async def about_command_handler(message: Message):
+    await _remember_chat(message)
+
     text = (
         "🛡 <b>Swear Checker Bot (v0.1.4)</b>\n\n"
         "Инспектор чата 👮‍♂️\n"
@@ -118,6 +225,8 @@ async def about_command_handler(message: Message):
         "▫️ <code>/subscribe_swears</code> — подписаться на ежедневные отчеты (только для админов)."
         ".\n"
         "▫️ <code>/unsubscribe_swears</code> — отписаться от ежедневных отчетов.\n\n"
+        "▫️ <code>/chat_id</code> — показать ID текущего чата.\n"
+        "▫️ <code>/say</code> — в личке показать чаты, куда можно отправить сообщение.\n\n"
         "Автор бота: @Gamubells (Telegram)"
     )
     await message.answer(text, parse_mode="HTML")
@@ -125,6 +234,8 @@ async def about_command_handler(message: Message):
 
 @router.message(Command("logs_swears"))
 async def logs_command_handler(message: Message):
+    await _remember_chat(message)
+
     if not message.from_user:
         return
 
@@ -163,6 +274,7 @@ async def logs_command_handler(message: Message):
 @router.message(F.text)
 async def bad_words_handler(message: Message):
     MESSAGES_TOTAL.inc()
+    await _remember_chat(message)
 
     if not message.from_user:
         logger.info("message ignored: from_user is missing")

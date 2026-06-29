@@ -67,6 +67,17 @@ async def on_startup(bot):
         await BadWordsRepository.ensure_daily_swears_integrity()
 
         active_chats = await BadWordsRepository.get_all_active_chats()
+        for chat_id in active_chats:
+            try:
+                chat = await bot.get_chat(chat_id)
+                await BadWordsRepository.upsert_bot_chat(
+                    chat_id=chat.id,
+                    title=chat.title,
+                    chat_type=chat.type,
+                )
+            except Exception:
+                logger.exception(f"Не удалось обновить данные чата {chat_id}")
+
         ACTIVE_SUBSCRIPTIONS.set(len(active_chats))
         logger.info(f"🔄 Метрика подписок инициализирована: {len(active_chats)}")
 
