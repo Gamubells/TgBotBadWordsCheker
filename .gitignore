@@ -39,6 +39,3 @@ logs/
 .idea/
 .DS_Store
 Thumbs.db
-
-# Local generated binaries/tools
-code2prompt
