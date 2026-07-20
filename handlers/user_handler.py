@@ -1,5 +1,7 @@
 import html
 from datetime import datetime
+from hashlib import sha256
+from random import Random
 from types import SimpleNamespace
 
 from aiogram import F, Router
@@ -28,6 +30,23 @@ MONTH_NAMES = {
     11: "Ноябрь",
     12: "Декабрь",
 }
+
+RARE_FIND_WORDS = (
+    "вафлер",
+    "гнида",
+    "говноед",
+    "говнючка",
+    "дрисня",
+    "мандавошка",
+    "мудозвон",
+    "обсосок",
+    "паскуда",
+    "паскудник",
+    "пердун",
+    "ссанина",
+    "шмара",
+)
+RARE_WORDS_PER_MONTH = 3
 
 
 def parse_say_command(text: str | None) -> tuple[int | str | None, str]:
@@ -69,6 +88,31 @@ def format_percent_delta(current: int, previous: int) -> str:
     if delta < 0:
         return f"{delta}%"
     return "0%"
+
+
+def get_month_rare_words(chat_id: int, year: int, month: int) -> tuple[str, ...]:
+    seed = f"{chat_id}:{year}:{month}".encode()
+    randomizer = Random(int.from_bytes(sha256(seed).digest(), "big"))
+
+    return tuple(randomizer.sample(RARE_FIND_WORDS, k=RARE_WORDS_PER_MONTH))
+
+
+def format_chat_comparison(swear_count: int, chat_swear_counts: list[int]) -> str:
+    other_counts = [count for count in chat_swear_counts if count != swear_count]
+    if not other_counts:
+        return "📍 Пока не с кем сравнить в этом месяце"
+
+    lower_count = sum(1 for count in other_counts if count < swear_count)
+    higher_count = sum(1 for count in other_counts if count > swear_count)
+
+    if lower_count > higher_count:
+        percent = round(lower_count / len(other_counts) * 100)
+        return f"📍 Ты материшься больше {percent}% чата"
+    if higher_count > lower_count:
+        percent = round(higher_count / len(other_counts) * 100)
+        return f"📍 Ты материшься меньше {percent}% чата"
+
+    return "📍 Ты примерно в середине чата"
 
 
 def _choose_special_profile_style(profile: SimpleNamespace) -> str | None:
@@ -142,6 +186,10 @@ def format_profile_report(username: str, year: int, month: int, profile: SimpleN
     favorite_word = html.escape(profile.favorite_word) if profile.favorite_word else "пока нет"
     style = choose_profile_style(profile, swear_index)
     delta = format_percent_delta(profile.swear_count, profile.previous_swear_count)
+    chat_comparison = format_chat_comparison(
+        profile.swear_count,
+        getattr(profile, "chat_swear_counts", []),
+    )
 
     return (
         "🪪 <b>Матный профиль</b>\n\n"
@@ -154,8 +202,38 @@ def format_profile_report(username: str, year: int, month: int, profile: SimpleN
         f"❤️ Любимый мат: <b>{favorite_word}</b>\n"
         f"🏆 Рекорд дня: <b>{profile.daily_record}</b>\n"
         f"📈 К прошлому месяцу: <b>{delta}</b>\n\n"
+        f"{html.escape(chat_comparison)}\n"
         f"🎭 Стиль: <b>{style}</b>"
     )
+
+
+async def announce_rare_find_if_needed(message: Message, found_words: list[str]) -> None:
+    if not message.from_user or message.chat.type == "private":
+        return
+
+    now = datetime.now(TZ_KYIV)
+    rare_words = get_month_rare_words(message.chat.id, now.year, now.month)
+    found_rare_words = [word for word in rare_words if word in found_words]
+
+    if not found_rare_words:
+        return
+
+    for rare_word in found_rare_words:
+        discovered = await BadWordsRepository.mark_rare_word_discovered(
+            chat_id=message.chat.id,
+            year=now.year,
+            month=now.month,
+            word=rare_word,
+            user_id=message.from_user.id,
+            username=message.from_user.full_name,
+        )
+        if not discovered:
+            continue
+
+        await message.answer(
+            f"💎 Вы нашли редкую находку: <b>{html.escape(rare_word)}</b>",
+            parse_mode="HTML",
+        )
 
 
 async def _remember_chat(message: Message) -> None:
@@ -473,5 +551,6 @@ async def bad_words_handler(message: Message):
             f"{swear_check.neutral_count} нейтральных ругательств в БД "
             f"от {message.from_user.full_name}"
         )
+        await announce_rare_find_if_needed(message, swear_check.swear_words)
     except Exception as e:
         logger.error(f"✗ Ошибка добавления ругательства: {e}")

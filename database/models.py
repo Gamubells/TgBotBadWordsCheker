@@ -38,6 +38,30 @@ class DailyMessages(Base):
     date: Mapped[date] = mapped_column(Date)
 
 
+class MonthlyRareWordDiscovery(Base):
+    __tablename__ = "monthly_rare_word_discoveries"
+    __table_args__ = (
+        UniqueConstraint(
+            "chat_id",
+            "year",
+            "month",
+            "word",
+            name="uq_monthly_rare_word_discoveries_chat_year_month",
+        ),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    chat_id: Mapped[int] = mapped_column(BigInteger)
+    year: Mapped[int] = mapped_column(Integer)
+    month: Mapped[int] = mapped_column(Integer)
+    word: Mapped[str] = mapped_column(String(255))
+    user_id: Mapped[int] = mapped_column(BigInteger)
+    username: Mapped[str] = mapped_column(String(255), nullable=True)
+    discovered_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=lambda: datetime.now(ZoneInfo("Europe/Kyiv"))
+    )
+
+
 class SwearLog(Base):
     __tablename__ = "swear_logs"
 

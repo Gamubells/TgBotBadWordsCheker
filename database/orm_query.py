@@ -6,7 +6,14 @@ from loguru import logger
 from sqlalchemy import delete, func, select, text
 
 from database.db import async_session_maker
-from database.models import BadWords, BotChat, DailyMessages, ReportChat, SwearLog
+from database.models import (
+    BadWords,
+    BotChat,
+    DailyMessages,
+    MonthlyRareWordDiscovery,
+    ReportChat,
+    SwearLog,
+)
 
 
 TZ_KYIV = ZoneInfo("Europe/Kyiv")
@@ -96,6 +103,15 @@ class BadWordsRepository:
                         """
                         CREATE UNIQUE INDEX IF NOT EXISTS uq_daily_messages_chat_user_date
                         ON daily_messages (chat_id, user_id, date)
+                        """
+                    )
+                )
+                await session.execute(
+                    text(
+                        """
+                        CREATE UNIQUE INDEX IF NOT EXISTS
+                        uq_monthly_rare_word_discoveries_chat_year_month
+                        ON monthly_rare_word_discoveries (chat_id, year, month, word)
                         """
                     )
                 )
@@ -467,6 +483,40 @@ class BadWordsRepository:
                 )
                 unique_count = (await session.execute(unique_stmt)).scalar_one()
 
+                monthly_swears_stmt = (
+                    select(
+                        BadWords.user_id.label("user_id"),
+                        func.sum(BadWords.badwords_count).label("swear_count"),
+                    )
+                    .where(
+                        BadWords.chat_id == chat_id,
+                        BadWords.date >= month_start,
+                        BadWords.date < next_month_start,
+                    )
+                    .group_by(BadWords.user_id)
+                )
+                monthly_swears = {
+                    row.user_id: row.swear_count or 0
+                    for row in (await session.execute(monthly_swears_stmt)).all()
+                }
+
+                monthly_messages_stmt = (
+                    select(DailyMessages.user_id.label("user_id"))
+                    .where(
+                        DailyMessages.chat_id == chat_id,
+                        DailyMessages.date >= month_start,
+                        DailyMessages.date < next_month_start,
+                    )
+                    .group_by(DailyMessages.user_id)
+                )
+                active_user_ids = {
+                    row.user_id for row in (await session.execute(monthly_messages_stmt)).all()
+                }
+                active_user_ids.update(monthly_swears)
+                chat_swear_counts = [
+                    monthly_swears.get(active_user_id, 0) for active_user_id in active_user_ids
+                ]
+
                 return SimpleNamespace(
                     swear_count=current.swear_count or 0,
                     neutral_count=current.neutral_count or 0,
@@ -476,6 +526,7 @@ class BadWordsRepository:
                     favorite_word=favorite.word if favorite else None,
                     favorite_count=favorite.word_count if favorite else 0,
                     unique_swear_count=unique_count or 0,
+                    chat_swear_counts=chat_swear_counts,
                 )
             except Exception as e:
                 logger.error(f"❌ Ошибка получения матного профиля: {e}")
@@ -488,7 +539,54 @@ class BadWordsRepository:
                     favorite_word=None,
                     favorite_count=0,
                     unique_swear_count=0,
+                    chat_swear_counts=[],
                 )
+
+    @classmethod
+    async def mark_rare_word_discovered(
+        cls,
+        chat_id,
+        year: int,
+        month: int,
+        word: str,
+        user_id,
+        username: str,
+    ) -> bool:
+        async with async_session_maker() as session:
+            try:
+                lock_key = f"rare-word:{chat_id}:{year}:{month}"
+                await session.execute(
+                    text("SELECT pg_advisory_xact_lock(hashtextextended(:lock_key, 0))"),
+                    {"lock_key": lock_key},
+                )
+
+                stmt = select(MonthlyRareWordDiscovery).where(
+                    MonthlyRareWordDiscovery.chat_id == chat_id,
+                    MonthlyRareWordDiscovery.year == year,
+                    MonthlyRareWordDiscovery.month == month,
+                    MonthlyRareWordDiscovery.word == word,
+                )
+                existing = (await session.execute(stmt)).scalar_one_or_none()
+                if existing:
+                    return False
+
+                session.add(
+                    MonthlyRareWordDiscovery(
+                        chat_id=chat_id,
+                        year=year,
+                        month=month,
+                        word=word,
+                        user_id=user_id,
+                        username=username,
+                        discovered_at=datetime.now(TZ_KYIV),
+                    )
+                )
+                await session.commit()
+                return True
+            except Exception as e:
+                await session.rollback()
+                logger.error(f"❌ Ошибка сохранения редкой находки: {e}")
+                return False
 
     @classmethod
     async def get_recent_logs(cls, chat_id, user_id, limit=30):

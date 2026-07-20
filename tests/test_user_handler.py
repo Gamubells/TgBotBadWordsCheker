@@ -2,8 +2,10 @@ from types import SimpleNamespace
 
 from handlers.user_handler import (
     choose_profile_style,
+    format_chat_comparison,
     format_log_word,
     format_profile_report,
+    get_month_rare_words,
     parse_say_command,
 )
 
@@ -47,6 +49,7 @@ def test_profile_report_is_compact_and_shows_main_stats():
         favorite_word="сука",
         favorite_count=19,
         unique_swear_count=6,
+        chat_swear_counts=[47, 8, 12, 80],
     )
 
     report = format_profile_report("Gamubells", 2026, 7, profile)
@@ -61,6 +64,7 @@ def test_profile_report_is_compact_and_shows_main_stats():
     assert "❤️ Любимый мат: <b>сука</b>" in report
     assert "🏆 Рекорд дня: <b>11</b>" in report
     assert "📈 К прошлому месяцу: <b>+24%</b>" in report
+    assert "📍 Ты материшься больше 67% чата" in report
 
 
 def test_profile_report_handles_empty_profile():
@@ -73,6 +77,7 @@ def test_profile_report_handles_empty_profile():
         favorite_word=None,
         favorite_count=0,
         unique_swear_count=0,
+        chat_swear_counts=[],
     )
 
     report = format_profile_report("Kostya", 2026, 7, profile)
@@ -80,6 +85,7 @@ def test_profile_report_handles_empty_profile():
     assert "💬 Индекс: <b>0%</b>" in report
     assert "❤️ Любимый мат: <b>пока нет</b>" in report
     assert "📈 К прошлому месяцу: <b>0%</b>" in report
+    assert "📍 Пока не с кем сравнить в этом месяце" in report
     assert "🎭 Стиль: <b>😇 Почти святой</b>" in report
 
 
@@ -105,3 +111,28 @@ def test_profile_style_detects_favorite_word_dominance():
     )
 
     assert choose_profile_style(profile, swear_index=4.0) == "❤️ Верный классике"
+
+
+def test_chat_comparison_detects_less_than_chat():
+    assert format_chat_comparison(5, [5, 8, 10, 1]) == "📍 Ты материшься меньше 67% чата"
+
+
+def test_chat_comparison_detects_middle_position():
+    assert format_chat_comparison(5, [5, 8, 1]) == "📍 Ты примерно в середине чата"
+
+
+def test_month_rare_words_are_stable():
+    words = get_month_rare_words(chat_id=-100123, year=2026, month=7)
+
+    assert get_month_rare_words(chat_id=-100123, year=2026, month=7) == words
+    assert len(words) == 3
+    assert len(set(words)) == 3
+    assert all(isinstance(word, str) and word for word in words)
+
+
+def test_month_rare_words_change_between_months():
+    assert get_month_rare_words(chat_id=-100123, year=2026, month=7) != get_month_rare_words(
+        chat_id=-100123,
+        year=2026,
+        month=8,
+    )
