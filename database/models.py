@@ -24,6 +24,20 @@ class BadWords(Base):
     date: Mapped[date] = mapped_column(Date)
 
 
+class DailyMessages(Base):
+    __tablename__ = "daily_messages"
+    __table_args__ = (
+        UniqueConstraint("chat_id", "user_id", "date", name="uq_daily_messages_chat_user_date"),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    chat_id: Mapped[int] = mapped_column(BigInteger)
+    user_id: Mapped[int] = mapped_column(BigInteger)
+    username: Mapped[str] = mapped_column(String(255), nullable=True)
+    message_count: Mapped[int] = mapped_column(Integer, default=0)
+    date: Mapped[date] = mapped_column(Date)
+
+
 class SwearLog(Base):
     __tablename__ = "swear_logs"
 

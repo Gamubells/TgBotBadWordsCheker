@@ -1,5 +1,6 @@
 import html
 from datetime import datetime
+from types import SimpleNamespace
 
 from aiogram import F, Router
 from aiogram.filters import Command, CommandStart
@@ -12,6 +13,21 @@ from services import check_text_for_swears_detailed
 
 
 router = Router()
+
+MONTH_NAMES = {
+    1: "Январь",
+    2: "Февраль",
+    3: "Март",
+    4: "Апрель",
+    5: "Май",
+    6: "Июнь",
+    7: "Июль",
+    8: "Август",
+    9: "Сентябрь",
+    10: "Октябрь",
+    11: "Ноябрь",
+    12: "Декабрь",
+}
 
 
 def parse_say_command(text: str | None) -> tuple[int | str | None, str]:
@@ -39,6 +55,107 @@ def format_log_word(word: str, category: str) -> str:
         return f"🟡 {escaped_word}"
 
     return escaped_word
+
+
+def format_percent_delta(current: int, previous: int) -> str:
+    if previous == 0:
+        if current == 0:
+            return "0%"
+        return "новый месяц"
+
+    delta = round((current - previous) / previous * 100)
+    if delta > 0:
+        return f"+{delta}%"
+    if delta < 0:
+        return f"{delta}%"
+    return "0%"
+
+
+def _choose_special_profile_style(profile: SimpleNamespace) -> str | None:
+    total_swears = profile.swear_count
+
+    if total_swears == 0 and profile.neutral_count > 0:
+        return "🟡 Интеллигентный токсик"
+    if profile.neutral_count > total_swears:
+        return "🟡 Интеллигентный токсик"
+    if total_swears >= 8 and profile.favorite_count / total_swears >= 0.4:
+        return "❤️ Верный классике"
+    if total_swears >= 10 and profile.unique_swear_count >= min(8, total_swears):
+        return "🎲 Лексический экспериментатор"
+    if profile.previous_swear_count > 0:
+        growth = (total_swears - profile.previous_swear_count) / profile.previous_swear_count
+        if growth >= 0.5 and total_swears >= 10:
+            return "📈 Набирает обороты"
+        if growth <= -0.5 and profile.previous_swear_count >= 10:
+            return "📉 Сдержался"
+
+    return None
+
+
+def _choose_index_profile_style(swear_index: float) -> str | None:
+    if swear_index >= 15:
+        return "☢️ Матный реактор"
+    if swear_index >= 7:
+        return "🚨 Опасная концентрация"
+    if swear_index >= 3:
+        return "🌶 Острый язык"
+
+    return None
+
+
+def _choose_count_profile_style(swear_count: int) -> str:
+    if swear_count == 0:
+        return "😇 Почти святой"
+    if swear_count <= 3:
+        return "🌱 Случайно вырвалось"
+    if swear_count <= 10:
+        return "🙂 Умеренно эмоциональный"
+    if swear_count <= 25:
+        return "🔥 Разогрелся"
+    if swear_count <= 50:
+        return "🎭 Эмоциональный критик"
+    if swear_count <= 100:
+        return "🏭 Заводской режим"
+    return "💀 Легенда чата"
+
+
+def choose_profile_style(profile: SimpleNamespace, swear_index: float) -> str:
+    total_rude = profile.swear_count + profile.neutral_count
+
+    if special_style := _choose_special_profile_style(profile):
+        return special_style
+
+    if index_style := _choose_index_profile_style(swear_index):
+        return index_style
+
+    if swear_index < 1 and total_rude > 0:
+        return "🧊 Холодная голова"
+
+    return _choose_count_profile_style(profile.swear_count)
+
+
+def format_profile_report(username: str, year: int, month: int, profile: SimpleNamespace) -> str:
+    total_rude = profile.swear_count + profile.neutral_count
+    swear_index = (
+        round(profile.swear_count / profile.message_count * 100, 1) if profile.message_count else 0
+    )
+    favorite_word = html.escape(profile.favorite_word) if profile.favorite_word else "пока нет"
+    style = choose_profile_style(profile, swear_index)
+    delta = format_percent_delta(profile.swear_count, profile.previous_swear_count)
+
+    return (
+        "🪪 <b>Матный профиль</b>\n\n"
+        f"👤 {html.escape(username)}\n"
+        f"📅 {MONTH_NAMES[month]} {year}\n\n"
+        f"🔥 Матов: <b>{profile.swear_count}</b>\n"
+        f"🟡 Мягких: <b>{profile.neutral_count}</b>\n"
+        f"📊 Всего ругательств: <b>{total_rude}</b>\n\n"
+        f"💬 Индекс: <b>{swear_index}%</b>\n"
+        f"❤️ Любимый мат: <b>{favorite_word}</b>\n"
+        f"🏆 Рекорд дня: <b>{profile.daily_record}</b>\n"
+        f"📈 К прошлому месяцу: <b>{delta}</b>\n\n"
+        f"🎭 Стиль: <b>{style}</b>"
+    )
 
 
 async def _remember_chat(message: Message) -> None:
@@ -142,6 +259,32 @@ async def count_command_handler(message: Message):
         await message.answer("⚠️ Не удалось получить статистику.")
 
 
+@router.message(Command("profile_swears"))
+async def profile_command_handler(message: Message):
+    await _remember_chat(message)
+
+    if not message.from_user:
+        return
+
+    now = datetime.now(TZ_KYIV)
+    profile = await BadWordsRepository.get_user_month_profile(
+        chat_id=message.chat.id,
+        user_id=message.from_user.id,
+        year=now.year,
+        month=now.month,
+    )
+
+    await message.answer(
+        format_profile_report(
+            username=message.from_user.full_name,
+            year=now.year,
+            month=now.month,
+            profile=profile,
+        ),
+        parse_mode="HTML",
+    )
+
+
 @router.message(Command("helpy_swears"))
 async def help_command_handler(message: Message):
     await message.answer("К сожалению помощь не придет.")
@@ -218,6 +361,7 @@ async def about_command_handler(message: Message):
         "• Персональная статистика и логирование.\n\n"
         "<b>Управление:</b>\n"
         "▫️ <code>/count_swears</code> — посмотреть количество своих матов за текущий день.\n"
+        "▫️ <code>/profile_swears</code> — посмотреть свой матный профиль за месяц.\n"
         "▫️ <code>/logs_swears</code> — запросить детализацию (время и текст найденных ругательств)."
         "\n"
         "▫️ <code>/about_swears</code> — информация о боте.\n"
@@ -291,6 +435,13 @@ async def bad_words_handler(message: Message):
             f"is_command={message.text.startswith('/') if message.text else False}"
         )
         return
+
+    await BadWordsRepository.increment_message_count(
+        chat_id=message.chat.id,
+        user_id=message.from_user.id,
+        username=message.from_user.full_name,
+        date=datetime.now(TZ_KYIV).date(),
+    )
 
     swear_check = check_text_for_swears_detailed(message.text)
 

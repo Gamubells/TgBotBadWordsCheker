@@ -1,12 +1,27 @@
 import asyncio
 from datetime import date, datetime, timedelta
+from types import SimpleNamespace
 
 from loguru import logger
 
-from database.orm_query import TZ_KYIV, BadWordsRepository
+from database.orm_query import TZ_KYIV, BadWordsRepository, get_previous_month
 
 
 MEDALS = ("🥇", "🥈", "🥉")
+
+
+def format_percent_delta(current: int, previous: int) -> str:
+    if previous == 0:
+        if current == 0:
+            return "0%"
+        return "новый месяц"
+
+    delta = round((current - previous) / previous * 100)
+    if delta > 0:
+        return f"+{delta}%"
+    if delta < 0:
+        return f"{delta}%"
+    return "0%"
 
 
 def format_daily_report(records) -> str:
@@ -40,7 +55,13 @@ def is_last_day_of_month(current_date: date) -> bool:
     return (current_date + timedelta(days=1)).month != current_date.month
 
 
-def format_monthly_report(records, year: int, month: int) -> str:
+def format_monthly_report(
+    records,
+    year: int,
+    month: int,
+    summary: SimpleNamespace | None = None,
+    previous_summary: SimpleNamespace | None = None,
+) -> str:
     ranked_records = sorted(
         (record for record in records if record.badwords_count > 0),
         key=lambda record: record.badwords_count,
@@ -64,6 +85,20 @@ def format_monthly_report(records, year: int, month: int) -> str:
         f"📊 Всего матов за месяц: {total_swears}\n"
         f"🟡 Нейтральных ругательств за месяц: {total_neutral}"
     )
+
+    if summary and previous_summary:
+        delta = format_percent_delta(summary.swear_count, previous_summary.swear_count)
+        text_parts.append(f"\n📈 К прошлому месяцу: {delta}")
+
+        if summary.favorite_word:
+            text_parts.append(f"\n❤️ Мат месяца: {summary.favorite_word}")
+
+        if summary.max_day and summary.max_day_swears:
+            text_parts.append(
+                f"\n🔥 Самый матный день: "
+                f"{summary.max_day.strftime('%d.%m')} — {summary.max_day_swears}"
+            )
+
     return "".join(text_parts)
 
 
@@ -93,13 +128,33 @@ async def send_daily_report(bot):
                 )
 
             if should_send_monthly_report:
+                prev_year, prev_month = get_previous_month(today.year, today.month)
                 month_records = await BadWordsRepository.get_all_for_month(
                     chat_id=chat_id,
                     year=today.year,
                     month=today.month,
                 )
+                summary = await BadWordsRepository.get_chat_month_summary(
+                    chat_id=chat_id,
+                    year=today.year,
+                    month=today.month,
+                )
+                previous_summary = await BadWordsRepository.get_chat_month_summary(
+                    chat_id=chat_id,
+                    year=prev_year,
+                    month=prev_month,
+                )
                 monthly_reports.append(
-                    (chat_id, format_monthly_report(month_records, today.year, today.month))
+                    (
+                        chat_id,
+                        format_monthly_report(
+                            month_records,
+                            today.year,
+                            today.month,
+                            summary,
+                            previous_summary,
+                        ),
+                    )
                 )
 
         if monthly_reports:

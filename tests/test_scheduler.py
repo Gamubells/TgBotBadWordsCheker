@@ -1,7 +1,12 @@
 from datetime import date
 from types import SimpleNamespace
 
-from scheduler import format_daily_report, format_monthly_report, is_last_day_of_month
+from scheduler import (
+    format_daily_report,
+    format_monthly_report,
+    format_percent_delta,
+    is_last_day_of_month,
+)
 
 
 def test_daily_report_is_sorted_by_swear_count_descending():
@@ -100,3 +105,36 @@ def test_monthly_report_handles_month_without_swears():
     assert "🥇 Neutral — 0" not in report
     assert "📊 Всего матов за месяц: 0" in report
     assert report.endswith("🟡 Нейтральных ругательств за месяц: 4")
+
+
+def test_monthly_report_adds_compact_month_comparison_summary():
+    records = [
+        SimpleNamespace(username="First", user_id=1, badwords_count=35, neutral_count=8),
+        SimpleNamespace(username="Second", user_id=2, badwords_count=21, neutral_count=5),
+    ]
+    summary = SimpleNamespace(
+        swear_count=56,
+        neutral_count=13,
+        favorite_word="сука",
+        max_day=date(2026, 7, 19),
+        max_day_swears=26,
+    )
+    previous_summary = SimpleNamespace(
+        swear_count=47,
+        neutral_count=10,
+        favorite_word="бля",
+        max_day=date(2026, 6, 5),
+        max_day_swears=12,
+    )
+
+    report = format_monthly_report(records, 2026, 7, summary, previous_summary)
+
+    assert "📈 К прошлому месяцу: +19%" in report
+    assert "❤️ Мат месяца: сука" in report
+    assert "🔥 Самый матный день: 19.07 — 26" in report
+
+
+def test_percent_delta_handles_empty_previous_month():
+    assert format_percent_delta(0, 0) == "0%"
+    assert format_percent_delta(5, 0) == "новый месяц"
+    assert format_percent_delta(5, 10) == "-50%"
