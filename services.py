@@ -8,8 +8,10 @@ WORD_PATTERN = re.compile(r"[а-яёa-z0-9]+")
 NON_WORD_CHAR_PATTERN = re.compile(r"[^а-яёa-z0-9]")
 DUPLICATE_PATTERN = re.compile(r"(.)\1+")
 OBFUSCATED_WORD_PATTERN = re.compile(
-    r"(?<![а-яёa-z0-9])(?:[а-яёa-z0-9][^а-яёa-z0-9\s]+){2,}[а-яёa-z0-9](?![а-яёa-z0-9])"
+    r"(?<![а-яёa-z0-9])(?:[а-яёa-z0-9]+[^а-яёa-z0-9\s]+)+"
+    r"[а-яёa-z0-9]+(?![а-яёa-z0-9])"
 )
+MAX_RECORDED_WORD_LENGTH = 100
 
 
 @dataclass(frozen=True)
@@ -93,6 +95,36 @@ def _find_word(
     return None
 
 
+def _limit_recorded_word(word: str) -> str:
+    return word[:MAX_RECORDED_WORD_LENGTH]
+
+
+def _classify_word(word: str) -> tuple[str | None, str | None]:
+    swear_word = _find_word(
+        word,
+        exact_words=EXACT_WORDS_SET,
+        aliases=EXACT_WORD_ALIASES,
+        include_roots=True,
+    )
+    if swear_word:
+        return swear_word, None
+
+    neutral_word = _find_word(
+        word,
+        exact_words=NEUTRAL_WORDS_SET,
+        aliases=NEUTRAL_WORD_ALIASES,
+    )
+    return None, neutral_word
+
+
+def _append_classified_word(word: str, swear_words: list[str], neutral_words: list[str]) -> None:
+    swear_word, neutral_word = _classify_word(word)
+    if swear_word:
+        swear_words.append(_limit_recorded_word(swear_word))
+    elif neutral_word:
+        neutral_words.append(_limit_recorded_word(neutral_word))
+
+
 def check_text_for_swears_detailed(text: str) -> SwearCheckResult:
     if not text:
         return SwearCheckResult(0, [], 0, [])
@@ -110,35 +142,24 @@ def check_text_for_swears_detailed(text: str) -> SwearCheckResult:
         text = pattern.sub(" ", text)
 
     words = WORD_PATTERN.findall(text)
-    obfuscated_words = [
-        NON_WORD_CHAR_PATTERN.sub("", match.group(0))
-        for match in OBFUSCATED_WORD_PATTERN.finditer(text)
-    ]
+    obfuscated_matches = list(OBFUSCATED_WORD_PATTERN.finditer(text))
 
     swear_words = []
     neutral_words = []
 
-    swear_words.extend(swear_phrase_matches)
-    neutral_words.extend(neutral_phrase_matches)
+    swear_words.extend(_limit_recorded_word(word) for word in swear_phrase_matches)
+    neutral_words.extend(_limit_recorded_word(word) for word in neutral_phrase_matches)
 
-    for word in words + obfuscated_words:
-        swear_word = _find_word(
-            word,
-            exact_words=EXACT_WORDS_SET,
-            aliases=EXACT_WORD_ALIASES,
-            include_roots=True,
-        )
-        if swear_word:
-            swear_words.append(swear_word)
+    for word in words:
+        _append_classified_word(word, swear_words, neutral_words)
+
+    for match in obfuscated_matches:
+        parts = WORD_PATTERN.findall(match.group(0))
+        if any(any(_classify_word(part)) for part in parts):
             continue
 
-        neutral_word = _find_word(
-            word,
-            exact_words=NEUTRAL_WORDS_SET,
-            aliases=NEUTRAL_WORD_ALIASES,
-        )
-        if neutral_word:
-            neutral_words.append(neutral_word)
+        word = NON_WORD_CHAR_PATTERN.sub("", match.group(0))
+        _append_classified_word(word, swear_words, neutral_words)
 
     return SwearCheckResult(
         swear_count=len(swear_words),

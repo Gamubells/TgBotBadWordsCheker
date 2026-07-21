@@ -8,6 +8,37 @@ from database.orm_query import TZ_KYIV, BadWordsRepository, get_previous_month
 
 
 MEDALS = ("🥇", "🥈", "🥉")
+TELEGRAM_TEXT_LIMIT = 4096
+
+
+def split_telegram_message(text: str, limit: int = TELEGRAM_TEXT_LIMIT) -> list[str]:
+    if limit <= 0:
+        raise ValueError("limit must be positive")
+    if not text:
+        return []
+
+    chunks = []
+    current_chars = []
+    current_length = 0
+    for char in text:
+        char_length = 2 if ord(char) > 0xFFFF else 1
+        if current_chars and current_length + char_length > limit:
+            chunks.append("".join(current_chars))
+            current_chars = []
+            current_length = 0
+
+        current_chars.append(char)
+        current_length += char_length
+
+    if current_chars:
+        chunks.append("".join(current_chars))
+
+    return chunks
+
+
+async def _send_message(bot, chat_id: int, text: str) -> None:
+    for chunk in split_telegram_message(text):
+        await bot.send_message(chat_id, chunk)
 
 
 def format_percent_delta(current: int, previous: int) -> str:
@@ -117,50 +148,56 @@ async def send_daily_report(bot):
         monthly_reports = []
 
         for chat_id in active_chats:
-            records = await BadWordsRepository.get_all_for_date(chat_id=chat_id, date=today)
+            try:
+                records = await BadWordsRepository.get_all_for_date(chat_id=chat_id, date=today)
 
-            if not records:
-                await bot.send_message(chat_id, "📊 Сегодня ругательств не было. Молодцы!")
-            else:
-                await bot.send_message(chat_id, format_daily_report(records))
-                await bot.send_message(
-                    chat_id, "Молодцы, все хорошо постарались! Завтра надо больше 😈"
-                )
-
-            if should_send_monthly_report:
-                prev_year, prev_month = get_previous_month(today.year, today.month)
-                month_records = await BadWordsRepository.get_all_for_month(
-                    chat_id=chat_id,
-                    year=today.year,
-                    month=today.month,
-                )
-                summary = await BadWordsRepository.get_chat_month_summary(
-                    chat_id=chat_id,
-                    year=today.year,
-                    month=today.month,
-                )
-                previous_summary = await BadWordsRepository.get_chat_month_summary(
-                    chat_id=chat_id,
-                    year=prev_year,
-                    month=prev_month,
-                )
-                monthly_reports.append(
-                    (
-                        chat_id,
-                        format_monthly_report(
-                            month_records,
-                            today.year,
-                            today.month,
-                            summary,
-                            previous_summary,
-                        ),
+                if not records:
+                    await _send_message(bot, chat_id, "📊 Сегодня ругательств не было. Молодцы!")
+                else:
+                    await _send_message(bot, chat_id, format_daily_report(records))
+                    await _send_message(
+                        bot, chat_id, "Молодцы, все хорошо постарались! Завтра надо больше 😈"
                     )
-                )
+
+                if should_send_monthly_report:
+                    prev_year, prev_month = get_previous_month(today.year, today.month)
+                    month_records = await BadWordsRepository.get_all_for_month(
+                        chat_id=chat_id,
+                        year=today.year,
+                        month=today.month,
+                    )
+                    summary = await BadWordsRepository.get_chat_month_summary(
+                        chat_id=chat_id,
+                        year=today.year,
+                        month=today.month,
+                    )
+                    previous_summary = await BadWordsRepository.get_chat_month_summary(
+                        chat_id=chat_id,
+                        year=prev_year,
+                        month=prev_month,
+                    )
+                    monthly_reports.append(
+                        (
+                            chat_id,
+                            format_monthly_report(
+                                month_records,
+                                today.year,
+                                today.month,
+                                summary,
+                                previous_summary,
+                            ),
+                        )
+                    )
+            except Exception:
+                logger.exception(f"❌ Не удалось отправить отчет в чат {chat_id}")
 
         if monthly_reports:
             await asyncio.sleep(60)
             for chat_id, report in monthly_reports:
-                await bot.send_message(chat_id, report)
+                try:
+                    await _send_message(bot, chat_id, report)
+                except Exception:
+                    logger.exception(f"❌ Не удалось отправить месячный отчет в чат {chat_id}")
 
-    except Exception as e:
-        logger.error(f"❌ Ошибка внутри планировщика отчетов: {e}")
+    except Exception:
+        logger.exception("❌ Ошибка внутри планировщика отчетов")

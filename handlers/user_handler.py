@@ -98,7 +98,11 @@ def get_month_rare_words(chat_id: int, year: int, month: int) -> tuple[str, ...]
 
 
 def format_chat_comparison(swear_count: int, chat_swear_counts: list[int]) -> str:
-    other_counts = [count for count in chat_swear_counts if count != swear_count]
+    other_counts = list(chat_swear_counts)
+    try:
+        other_counts.remove(swear_count)
+    except ValueError:
+        pass
     if not other_counts:
         return "📍 Пока не с кем сравнить в этом месяце"
 
@@ -267,7 +271,12 @@ async def _is_admin_or_private_chat(message: Message) -> bool:
     if message.chat.type == "private":
         return True
 
-    member = await message.bot.get_chat_member(message.chat.id, message.from_user.id)
+    try:
+        member = await message.bot.get_chat_member(message.chat.id, message.from_user.id)
+    except Exception:
+        logger.exception(f"Не удалось проверить права пользователя в чате {message.chat.id}")
+        return False
+
     return member.status in {"creator", "administrator"}
 
 
@@ -503,8 +512,8 @@ async def bad_words_handler(message: Message):
         return
 
     logger.info(
-        f"received message: {message.text} from {message.from_user.full_name} "
-        f"(id={message.from_user.id}, bot={message.from_user.is_bot})"
+        f"received text message: chat_id={message.chat.id}, user_id={message.from_user.id}, "
+        f"length={len(message.text or '')}, bot={message.from_user.is_bot}"
     )
 
     if message.from_user.is_bot or not message.text or message.text.startswith("/"):
@@ -530,10 +539,8 @@ async def bad_words_handler(message: Message):
         SWEARS_TOTAL.inc(swear_check.swear_count)
 
     logger.info(
-        f"Найдены маты: {swear_check.swear_words} (всего: {swear_check.swear_count}), "
-        f"нейтральные ругательства: {swear_check.neutral_words} "
-        f"(всего: {swear_check.neutral_count}) от "
-        f"{message.from_user.full_name} (uid:{message.from_user.id})"
+        f"Найдены ругательства: chat_id={message.chat.id}, user_id={message.from_user.id}, "
+        f"маты={swear_check.swear_count}, нейтральные={swear_check.neutral_count}"
     )
     try:
         await BadWordsRepository.add_swear(
@@ -548,8 +555,8 @@ async def bad_words_handler(message: Message):
         )
         logger.info(
             f"✓ Добавлено {swear_check.swear_count} матов и "
-            f"{swear_check.neutral_count} нейтральных ругательств в БД "
-            f"от {message.from_user.full_name}"
+            f"{swear_check.neutral_count} нейтральных ругательств в БД: "
+            f"chat_id={message.chat.id}, user_id={message.from_user.id}"
         )
         await announce_rare_find_if_needed(message, swear_check.swear_words)
     except Exception as e:

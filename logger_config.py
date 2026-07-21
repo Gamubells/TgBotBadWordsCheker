@@ -1,4 +1,3 @@
-import html
 import logging
 import os
 import sys
@@ -7,8 +6,11 @@ import urllib.request
 from pathlib import Path
 
 import sentry_sdk
+from dotenv import load_dotenv
 from loguru import logger
 
+
+load_dotenv()
 
 LOGS_DIR = Path("logs")
 LOGS_DIR.mkdir(exist_ok=True)
@@ -34,21 +36,20 @@ def telegram_alert_sink(message):
     if not BOT_TOKEN or not ADMIN_ID:
         return
 
-    escaped_msg = html.escape(str(message))
-
-    text = f"🚨 <b>Ошибка в боте!</b>\n\n<pre>{escaped_msg}</pre>"
+    text = f"🚨 Ошибка в боте!\n\n{message}"
     if len(text) > 4000:
-        text = text[:4000] + "\n...[ОБРЕЗАНО]...</pre>"
+        text = text[:3975] + "\n...[ОБРЕЗАНО]..."
 
     url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
     try:
-        data = urllib.parse.urlencode(
-            {"chat_id": ADMIN_ID, "text": text, "parse_mode": "HTML"}
-        ).encode()
+        data = urllib.parse.urlencode({"chat_id": ADMIN_ID, "text": text}).encode()
         with urllib.request.urlopen(urllib.request.Request(url, data=data), timeout=5):
             pass
-    except Exception as e:
-        print(f"Ошибка отправки алерта в ТГ: {e}", file=sys.stderr)
+    except Exception as error:
+        print(
+            f"Ошибка отправки алерта в ТГ ({type(error).__name__})",
+            file=sys.stderr,
+        )
 
 
 class InterceptHandler(logging.Handler):
@@ -73,10 +74,11 @@ def setup_logging():
     logger.add(LOGS_DIR / "app.log", rotation="5 MB", level="INFO")
 
     if SENTRY_DSN:
-        logger.add(sentry_sink, level="ERROR")
+        logger.add(sentry_sink, level="ERROR", enqueue=True)
 
     logger.add(
         telegram_alert_sink,
         level="ERROR",
         format="{time:YYYY-MM-DD HH:mm:ss} | {name}:{function}:{line}\n{message}",
+        enqueue=True,
     )

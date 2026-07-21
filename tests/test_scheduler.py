@@ -1,3 +1,4 @@
+import asyncio
 from datetime import date
 from types import SimpleNamespace
 
@@ -6,7 +7,38 @@ from scheduler import (
     format_monthly_report,
     format_percent_delta,
     is_last_day_of_month,
+    split_telegram_message,
 )
+
+
+def test_daily_report_failure_does_not_block_other_chats(monkeypatch):
+    import scheduler
+
+    class Repository:
+        @staticmethod
+        async def get_all_active_chats():
+            return [1, 2]
+
+        @staticmethod
+        async def get_all_for_date(*, chat_id, date):
+            return []
+
+    class Bot:
+        def __init__(self):
+            self.attempted_chats = []
+
+        async def send_message(self, chat_id, text):
+            self.attempted_chats.append(chat_id)
+            if chat_id == 1:
+                raise RuntimeError("chat unavailable")
+
+    bot = Bot()
+    monkeypatch.setattr(scheduler, "BadWordsRepository", Repository)
+    monkeypatch.setattr(scheduler, "is_last_day_of_month", lambda current_date: False)
+
+    asyncio.run(scheduler.send_daily_report(bot))
+
+    assert bot.attempted_chats == [1, 2]
 
 
 def test_daily_report_is_sorted_by_swear_count_descending():
@@ -138,3 +170,12 @@ def test_percent_delta_handles_empty_previous_month():
     assert format_percent_delta(0, 0) == "0%"
     assert format_percent_delta(5, 0) == "новый месяц"
     assert format_percent_delta(5, 10) == "-50%"
+
+
+def test_long_telegram_message_is_split_without_data_loss():
+    text = "first line\n" + "😀" * 3000 + "\nlast line"
+
+    chunks = split_telegram_message(text)
+
+    assert "".join(chunks) == text
+    assert all(0 < len(chunk.encode("utf-16-le")) // 2 <= 4096 for chunk in chunks)

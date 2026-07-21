@@ -1,5 +1,6 @@
 from pydantic import model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
+from sqlalchemy import URL
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
 
@@ -18,7 +19,17 @@ class Settings(BaseSettings):
 
     @model_validator(mode="after")
     def assemble_db_url(self):
-        self.DATABASE_URL = f"postgresql+asyncpg://{self.DB_USER}:{self.DB_PASS}@{self.DB_HOST}:{self.DB_PORT}/{self.DB_NAME}"
+        if self.DATABASE_URL:
+            return self
+
+        self.DATABASE_URL = URL.create(
+            drivername="postgresql+asyncpg",
+            username=self.DB_USER,
+            password=self.DB_PASS,
+            host=self.DB_HOST,
+            port=self.DB_PORT,
+            database=self.DB_NAME,
+        ).render_as_string(hide_password=False)
         return self
 
 

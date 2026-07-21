@@ -17,6 +17,7 @@ from database.models import (
 
 
 TZ_KYIV = ZoneInfo("Europe/Kyiv")
+MAX_DB_TEXT_LENGTH = 255
 
 
 def get_month_bounds(year: int, month: int) -> tuple[date, date]:
@@ -235,7 +236,7 @@ class BadWordsRepository:
                         chat_id=chat_id,
                         user_id=user_id,
                         username=username,
-                        word=word,
+                        word=word[:MAX_DB_TEXT_LENGTH],
                         category="swear",
                         timestamp=datetime.now(TZ_KYIV),
                     )
@@ -246,7 +247,7 @@ class BadWordsRepository:
                         chat_id=chat_id,
                         user_id=user_id,
                         username=username,
-                        word=word,
+                        word=word[:MAX_DB_TEXT_LENGTH],
                         category="neutral",
                         timestamp=datetime.now(TZ_KYIV),
                     )

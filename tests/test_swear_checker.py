@@ -162,6 +162,20 @@ def test_obfuscated_word_with_symbols_counts_once():
     assert found_words == ["пиздец"]
 
 
+@pytest.mark.parametrize("text", ["пи-здец", "пиз-дец", "пи\u200bздец", "с\u200bука"])
+def test_single_symbol_insertion_does_not_bypass_filter(text):
+    assert contains_bad_word(text)
+
+
+def test_punctuation_between_regular_words_does_not_double_count():
+    result = check_text_for_swears_detailed("пиздец,херня")
+
+    assert result.swear_count == 1
+    assert result.swear_words == ["пиздец"]
+    assert result.neutral_count == 1
+    assert result.neutral_words == ["херня"]
+
+
 def test_normal_word_containing_exact_word_is_not_detected():
     assert check_text_for_swears("сукинсын") == (0, [])
 
@@ -241,3 +255,17 @@ def test_obfuscated_two_letter_word_is_not_detected_by_symbol_joiner():
 
 def test_numbers_do_not_create_false_positive():
     assert check_text_for_swears("номер 1304") == (0, [])
+
+
+def test_very_long_root_match_is_safely_limited_for_storage():
+    count, found_words = check_text_for_swears("пизд" + "аб" * 250)
+
+    assert count == 1
+    assert len(found_words[0]) == 100
+
+
+def test_exact_phrase_with_long_whitespace_is_safely_limited_for_storage():
+    result = check_text_for_swears_detailed("голем" + " " * 500 + "пучеглазый")
+
+    assert result.neutral_count == 1
+    assert len(result.neutral_words[0]) == 100

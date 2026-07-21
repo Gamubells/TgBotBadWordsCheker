@@ -1,6 +1,8 @@
+import asyncio
 from types import SimpleNamespace
 
 from handlers.user_handler import (
+    _is_admin_or_private_chat,
     choose_profile_style,
     format_chat_comparison,
     format_log_word,
@@ -8,6 +10,20 @@ from handlers.user_handler import (
     get_month_rare_words,
     parse_say_command,
 )
+
+
+def test_admin_check_fails_closed_on_telegram_error():
+    class FailingBot:
+        async def get_chat_member(self, chat_id, user_id):
+            raise RuntimeError("Telegram unavailable")
+
+    message = SimpleNamespace(
+        bot=FailingBot(),
+        chat=SimpleNamespace(id=-100123, type="group"),
+        from_user=SimpleNamespace(id=42),
+    )
+
+    assert asyncio.run(_is_admin_or_private_chat(message)) is False
 
 
 def test_format_log_word_marks_neutral_words():
@@ -119,6 +135,10 @@ def test_chat_comparison_detects_less_than_chat():
 
 def test_chat_comparison_detects_middle_position():
     assert format_chat_comparison(5, [5, 8, 1]) == "📍 Ты примерно в середине чата"
+
+
+def test_chat_comparison_keeps_other_users_with_same_count():
+    assert format_chat_comparison(5, [5, 5, 1]) == "📍 Ты материшься больше 50% чата"
 
 
 def test_month_rare_words_are_stable():
