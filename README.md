@@ -1,102 +1,109 @@
-# 🤬 Swear Checker Bot
+# 🤬 Telegram Swear Moderation Bot
 
 ![Python Version](https://img.shields.io/badge/python-3.12-blue.svg)
 ![aiogram Version](https://img.shields.io/badge/aiogram-3.27-blue.svg)
 ![PostgreSQL](https://img.shields.io/badge/PostgreSQL-15-blue.svg)
 ![Docker](https://img.shields.io/badge/Docker-ready-blue.svg)
 
-**Swear Checker Bot** — это асинхронный Telegram-бот инспектор, который отслеживает нецензурную лексику в чатах, ведет детальную статистику по каждому пользователю и рассылает ежедневные отчеты.
+**Telegram Swear Moderation Bot** is an asynchronous Telegram moderation bot that detects profanity in group chats, keeps detailed statistics for each user, and sends daily reports.
 
-Бот спроектирован с учетом производительности: использует асинхронную работу с базой данных (SQLAlchemy + asyncpg), предкомпиляцию регулярных выражений и сервисную архитектуру.
+The bot is designed for performance. It uses asynchronous database access with SQLAlchemy and asyncpg, precompiled regular expressions, and a service-oriented architecture.
 
-## ✨ Ключевые особенности
+## ✨ Key Features
 
-- 🧠 **Умный парсинг**: Распознавание матерных корней в любых склонениях и точных совпадений.
-- 🛡️ **Защита от обхода**: Успешно обходит Leetspeak (замену букв на цифры/символы, например `@` вместо `а`) и игнорирует дублирование символов (`пппиииззздддеееццц`).
-- 📊 **Система подписок**: Чаты могут подписываться на автоматическую рассылку ежедневной статистики.
-- 🪪 **Матные профили**: Пользователь может запросить компактную месячную сводку с индексом, любимым матом, рекордом дня и стилем месяца.
-- 📈 **Месячная динамика**: В конце месяца отчет показывает сравнение с прошлым месяцем, мат месяца и самый матный день.
-- 💎 **Редкие находки месяца**: Для каждого чата автоматически выбираются 3 редких слова месяца; первый нашедший каждое слово получает одно короткое сообщение в чат.
-- ⏰ **Планировщик задач**: Ежедневные отчеты отправляются строго в 23:01 по Киеву с помощью `APScheduler`.
-- 🐳 **Легкий деплой**: Полностью готов к запуску через Docker и Docker Compose.
+- 🧠 **Smart detection:** Recognizes profane word roots across different inflections as well as exact matches.
+- 🛡️ **Evasion resistance:** Detects leetspeak substitutions (for example, `@` instead of `а`) and repeated characters such as `пппиииззздддеееццц`.
+- 📊 **Chat subscriptions:** Chats can subscribe to automatic daily statistics reports.
+- 🪪 **User profiles:** Users can request a compact monthly summary with their profanity index, most-used swear word, daily record, and monthly style.
+- 📈 **Monthly trends:** End-of-month reports compare results with the previous month and highlight the month's most-used swear word and most active day.
+- 💎 **Rare finds:** The bot automatically selects three rare words for each chat every month and posts a short message when a user finds one first.
+- ⏰ **Task scheduling:** APScheduler sends daily reports at 23:01 Kyiv time.
+- 🐳 **Easy deployment:** Ready to run with Docker and Docker Compose.
 
-## 🛠 Технологический стек
+## 🛠 Technology Stack
 
-- **Язык:** Python 3.12
-- **Фреймворк:** aiogram 3.x
-- **База данных:** PostgreSQL
+- **Language:** Python 3.12
+- **Framework:** aiogram 3.x
+- **Database:** PostgreSQL
 - **ORM:** SQLAlchemy 2.0 (asyncio) + asyncpg
-- **Планировщик:** APScheduler
-- **Управление зависимостями:** Poetry
-- **Инфраструктура:** Docker, Docker Compose
+- **Scheduler:** APScheduler
+- **Dependency management:** Poetry
+- **Infrastructure:** Docker, Docker Compose
 
-## 🚀 Установка и запуск (Docker)
+## 🚀 Installation and Docker Setup
 
-Это самый быстрый и рекомендуемый способ запуска для сервера.
+This is the fastest and recommended way to run the bot on a server.
 
-1. **Клонируйте репозиторий:**
+1. **Clone the repository:**
+
    ```bash
-   git clone https://github.com/ваший_юзернейм/swear_tg_bot_cheker.git
-   cd swear_tg_bot_cheker
+   git clone https://github.com/Gamubells/telegram-SwearModeration-bot.git
+   cd telegram-SwearModeration-bot
    ```
 
-2. **Настройте переменные окружения:**
-   Скопируйте пример конфига и вставьте свои данные (токен бота от @BotFather):
+2. **Configure environment variables:**
+
+   Copy the example configuration and add your credentials, including the bot token from [@BotFather](https://t.me/BotFather):
+
    ```bash
    cp .env.example .env
    ```
-   Убедитесь, что в `.env` для Docker установлено `DB_HOST=db`.
 
-3. **Запустите контейнеры:**
+   Make sure `DB_HOST=db` is set in `.env` when running with Docker.
+
+3. **Start the containers:**
+
    ```bash
-   docker-compose up -d
+   docker compose up -d
    ```
 
-4. **Проверьте логи (опционально):**
+4. **Check the logs (optional):**
+
    ```bash
-   docker-compose logs -f bot
+   docker compose logs -f bot
    ```
 
-## 💻 Локальная разработка
+## 💻 Local Development
 
-Если вы хотите запустить проект локально для доработки (потребуется установленный PostgreSQL и Poetry):
+Local development requires PostgreSQL and Poetry.
 
-1. **Установите зависимости через Poetry:**
+1. **Install dependencies:**
+
    ```bash
    poetry install
    ```
 
-2. **Настройте `.env` файл:**
-   Для локального запуска используйте `DB_HOST=localhost`
+2. **Configure the `.env` file:**
 
-3. **Запустите бота:**
+   Use `DB_HOST=localhost` for a local database.
+
+3. **Run the bot:**
+
    ```bash
    poetry run python app.py
    ```
 
-## 📱 Команды бота
+## 📱 Bot Commands
 
-Бот поддерживает следующие команды в Telegram:
+- `/start` — Display a welcome message and verify that the bot is running.
+- `/count_swears` — Show your profanity count for today.
+- `/profile_swears` — Show your profanity profile for the current month.
+- `/logs_swears` — Show a detailed log of detected profanity for the day, including time and message text.
+- `/subscribe_swears` — Subscribe the current chat to daily reports sent at 23:01.
+- `/unsubscribe_swears` — Unsubscribe the current chat from daily reports.
+- `/about_swears` — Show information about the bot and its author.
 
-- `/start` — Приветствие и проверка работоспособности.
-- `/count_swears` — Узнать количество своих матов за сегодня.
-- `/profile_swears` — Получить свой матный профиль за текущий месяц.
-- `/logs_swears` — Получить детализированный лог (время и текст) найденных ругательств за день.
-- `/subscribe_swears` — Подписать текущий чат на ежедневную рассылку отчетов (23:01).
-- `/unsubscribe_swears` — Отписать чат от рассылки.
-- `/about_swears` — Информация о боте и авторе.
+## 🗂 Project Structure
 
-## 🗂 Структура проекта
+The project follows separation-of-concerns principles:
 
-Бот написан с соблюдением принципа разделения ответственности (Separation of Concerns):
+- `app.py` — Application entry point and scheduler initialization.
+- `handlers/` — Telegram routers and command handlers.
+- `services.py` — Business logic, precompiled regular expressions, and text parsing.
+- `database/` — SQLAlchemy configuration, models, and CRUD repositories.
+- `scheduler.py` — Scheduled report generation and delivery.
+- `bad_words_list.py` — Dictionaries and character mappings used for filtering.
 
-- `app.py` — Точка входа, инициализация бота и планировщика.
-- `handlers/` — Маршрутизаторы и обработчики команд Telegram.
-- `services.py` — Бизнес-логика: предкомпилированные регулярные выражения и парсинг текста.
-- `database/` — Слой работы с данными (конфигурация SQLAlchemy, модели и CRUD-репозитории).
-- `scheduler.py` — Логика формирования и отправки отчетов по расписанию.
-- `bad_words_list.py` — Словари и маппинги для фильтрации.
+## 🐛 Troubleshooting
 
-## 🐛 Отладка и решение проблем
-
-Если у вас возникли проблемы с подключением к БД или учетом слов, загляните в файл [DEBUGGING.md](DEBUGGING.md), где собраны решения самых частых проблем.
+If you experience database connection or word-counting issues, see [DEBUGGING.md](DEBUGGING.md) for solutions to common problems.
